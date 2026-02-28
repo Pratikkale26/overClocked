@@ -2,31 +2,19 @@
 
 import type { MilestoneUpdate } from "../../lib/api";
 
-const TYPE_ICONS: Record<string, string> = {
-    PROGRESS: "📋",
-    EXPENSE: "💸",
-    PHOTO: "📸",
-    COMPLETION: "✅",
-    ANNOUNCEMENT: "📢",
+const TYPE_ICON: Record<string, string> = { PROGRESS: "📋", EXPENSE: "💸", PHOTO: "📸", COMPLETION: "✅", ANNOUNCEMENT: "📢" };
+const TYPE_COLOR: Record<string, string> = {
+    PROGRESS: "text-violet-400 border-violet-500/30",
+    EXPENSE: "text-amber-400 border-amber-500/30",
+    PHOTO: "text-cyan-400 border-cyan-500/30",
+    COMPLETION: "text-emerald-400 border-emerald-500/30",
+    ANNOUNCEMENT: "text-pink-400 border-pink-500/30",
 };
 
-const TYPE_COLORS: Record<string, string> = {
-    PROGRESS: "var(--violet-light)",
-    EXPENSE: "var(--warning)",
-    PHOTO: "#22d3ee",
-    COMPLETION: "var(--success)",
-    ANNOUNCEMENT: "#f472b6",
-};
-
-interface DprTimelineProps {
-    updates: MilestoneUpdate[];
-    title?: string;
-}
-
-export function DprTimeline({ updates, title = "Activity Log" }: DprTimelineProps) {
+export function DprTimeline({ updates, title = "Activity Log" }: { updates: MilestoneUpdate[]; title?: string }) {
     if (!updates.length) {
         return (
-            <div style={{ padding: "24px", textAlign: "center", color: "var(--text-muted)", fontSize: 14 }}>
+            <div className="py-6 text-center text-sm text-white/30">
                 No updates posted yet. The creator will post progress, expenses, and photos here.
             </div>
         );
@@ -34,72 +22,52 @@ export function DprTimeline({ updates, title = "Activity Log" }: DprTimelineProp
 
     return (
         <div>
-            {title && (
-                <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 18, color: "var(--text-secondary)" }}>
-                    {title}
-                </h3>
-            )}
-            <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+            <div className="flex flex-col">
                 {updates.map((u, i) => (
-                    <div key={u.id} style={{ display: "flex", gap: 14, position: "relative" }}>
-                        {/* Timeline track */}
-                        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flexShrink: 0 }}>
-                            <div style={{
-                                width: 32, height: 32, borderRadius: "50%",
-                                background: "var(--bg-elevated)",
-                                border: `2px solid ${TYPE_COLORS[u.type] ?? "var(--border)"}`,
-                                display: "flex", alignItems: "center", justifyContent: "center",
-                                fontSize: 14, flexShrink: 0,
-                                boxShadow: `0 0 10px ${TYPE_COLORS[u.type] ?? "transparent"}40`,
-                            }}>
-                                {TYPE_ICONS[u.type] ?? "📌"}
+                    <div key={u.id} className="flex gap-3.5">
+                        {/* Dot + line */}
+                        <div className="flex flex-col items-center shrink-0">
+                            <div className={`w-8 h-8 rounded-full border flex items-center justify-center text-sm bg-[#0a0a14] ${TYPE_COLOR[u.type] ?? "border-white/10"}`}>
+                                {TYPE_ICON[u.type] ?? "📌"}
                             </div>
                             {i < updates.length - 1 && (
-                                <div style={{ width: 2, flex: 1, minHeight: 20, background: "var(--border)", margin: "4px 0" }} />
+                                <div className="w-px flex-1 min-h-4 my-1 bg-white/[0.06]" />
                             )}
                         </div>
 
                         {/* Content */}
-                        <div style={{ flex: 1, paddingBottom: i < updates.length - 1 ? 20 : 0 }}>
-                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, marginBottom: 4 }}>
-                                <div>
-                                    <span style={{
-                                        fontSize: 10, fontWeight: 700,
-                                        color: TYPE_COLORS[u.type] ?? "var(--text-muted)",
-                                        textTransform: "uppercase", letterSpacing: "0.06em",
-                                        marginRight: 8,
-                                    }}>
+                        <div className={`flex-1 min-w-0 ${i < updates.length - 1 ? "pb-5" : ""}`}>
+                            <div className="flex items-start justify-between gap-2 mb-0.5">
+                                <div className="flex items-center gap-2 min-w-0">
+                                    <span className={`text-[10px] font-bold uppercase tracking-widest shrink-0 ${u.type === "EXPENSE" ? "text-amber-400" :
+                                            u.type === "COMPLETION" ? "text-emerald-400" :
+                                                u.type === "PHOTO" ? "text-cyan-400" :
+                                                    u.type === "ANNOUNCEMENT" ? "text-pink-400" : "text-violet-400"
+                                        }`}>
                                         {u.type}
                                     </span>
-                                    <span style={{ fontSize: 14, fontWeight: 600 }}>{u.title}</span>
+                                    <span className="text-sm font-semibold text-white/80 truncate">{u.title}</span>
                                 </div>
-                                <span style={{ fontSize: 11, color: "var(--text-muted)", flexShrink: 0 }}>
-                                    {new Date(u.postedAt).toLocaleDateString("en-IN", {
-                                        day: "numeric", month: "short",
-                                    })}
+                                <span className="text-[11px] text-white/25 shrink-0">
+                                    {new Date(u.postedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
                                 </span>
                             </div>
                             {u.description && (
-                                <p style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.55, marginTop: 2 }}>
-                                    {u.description}
-                                </p>
+                                <p className="text-[13px] text-white/40 leading-relaxed mt-0.5">{u.description}</p>
                             )}
                             {u.mediaUrls?.length > 0 && (
-                                <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+                                <div className="flex gap-2 mt-2.5 flex-wrap">
                                     {u.mediaUrls.map((url, mi) => (
                                         <a key={mi} href={url} target="_blank" rel="noreferrer">
-                                            <img
-                                                src={url}
-                                                alt={`media-${mi}`}
-                                                style={{ width: 80, height: 60, objectFit: "cover", borderRadius: 8, border: "1px solid var(--border)" }}
+                                            <img src={url} alt={`media-${mi}`}
+                                                className="w-20 h-16 object-cover rounded-lg border border-white/[0.06] hover:border-violet-500/30 transition-colors"
                                                 onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
                                             />
                                         </a>
                                     ))}
                                 </div>
                             )}
-                            {/* Proof-of-history hash */}
-                            <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 6, fontFamily: "monospace" }}>
+                            <div className="text-[10px] font-mono text-white/15 mt-1.5">
                                 #{u.contentHash?.slice(0, 12)}
                             </div>
                         </div>

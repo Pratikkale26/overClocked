@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Script from "next/script";
 import { Toaster } from "sonner";
 import { Providers } from "../components/Providers";
 import "./globals.css";
@@ -17,8 +16,8 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <body>
+    <html lang="en" className="dark">
+      <body className="min-h-screen bg-[#050509] text-white font-['Inter'] antialiased">
         <Providers>
           {children}
           <Toaster
@@ -26,15 +25,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             position="bottom-right"
             toastOptions={{
               style: {
-                background: "var(--bg-card)",
-                border: "1px solid var(--border-hover)",
-                color: "var(--text-primary)",
+                background: "#0f0f1a",
+                border: "1px solid rgba(255,255,255,0.06)",
+                color: "#fff",
                 fontFamily: "Inter, sans-serif",
               },
             }}
           />
         </Providers>
-        {/* <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="lazyOnload" /> */}
       </body>
     </html>
   );

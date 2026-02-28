@@ -7,28 +7,32 @@ import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
 import { AnchorProvider } from "@coral-xyz/anchor";
 import { toast } from "sonner";
-import { Plus, Trash2, ArrowRight, ArrowLeft, Info } from "lucide-react";
+import { Plus, Trash2, ArrowRight, ArrowLeft, Info, Wallet } from "lucide-react";
 import { Navbar } from "../../components/layout/Navbar";
 import { createCampaignMeta, createOrgMeta, verifyOrgGstin, patchCampaignOnchain } from "../../lib/api";
 import { YIELD_LABELS, ORG_CATEGORY_LABELS, LAMPORTS_PER_SOL } from "../../lib/utils";
 import {
-    getProgram,
-    buildCreateOrgTx,
-    buildCreateProjectTx,
-    generateProjectId,
-    projectIdToHex,
-    yieldPolicyToRateBps,
-    deriveOrgPDA,
-    fetchOrgAccount,
+    getProgram, buildCreateOrgTx, buildCreateProjectTx, generateProjectId,
+    projectIdToHex, deriveOrgPDA, fetchOrgAccount,
 } from "../../lib/anchor";
 
-const STEPS = ["Org Check", "Campaign Info", "Milestones", "Review & Launch"];
+const STEPS = ["Organisation", "Campaign", "Milestones", "Launch"];
 
-interface MilestoneForm {
-    title: string;
-    description: string;
-    amountSol: string;
+interface MilestoneForm { title: string; description: string; amountSol: string }
+
+// Reusable: label + input
+function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+    return (
+        <div>
+            <label className="block text-xs font-semibold text-white/40 uppercase tracking-wider mb-2">{label}</label>
+            {children}
+            {hint && <p className="text-[11px] text-white/20 mt-1.5">{hint}</p>}
+        </div>
+    );
 }
+
+const inputCls = "w-full px-4 py-3 rounded-xl bg-[#161625] border border-white/[0.08] text-white text-sm placeholder-white/20 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500/30 transition-all";
+const selectCls = inputCls + " appearance-none";
 
 export default function CreatePage() {
     const router = useRouter();
@@ -39,7 +43,7 @@ export default function CreatePage() {
     const [step, setStep] = useState(0);
     const [loading, setLoading] = useState(false);
 
-    // Org fields
+    // Org
     const [orgName, setOrgName] = useState("");
     const [orgCategory, setOrgCategory] = useState("STUDENT_ORG");
     const [orgDescription, setOrgDescription] = useState("");
@@ -47,7 +51,7 @@ export default function CreatePage() {
     const [orgGstin, setOrgGstin] = useState("");
     const [gstinChecking, setGstinChecking] = useState(false);
 
-    // Campaign fields
+    // Campaign
     const [title, setTitle] = useState("");
     const [description, setDescription] = useState("");
     const [tags, setTags] = useState("");
@@ -57,16 +61,15 @@ export default function CreatePage() {
 
     if (!authenticated) {
         return (
-            <div>
+            <div className="min-h-screen bg-[#050509] text-white font-['Inter']">
                 <Navbar />
-                <div className="container" style={{ paddingTop: 80, textAlign: "center" }}>
-                    <div style={{ fontSize: 48, marginBottom: 16 }}>🔐</div>
-                    <h2 style={{ marginBottom: 12 }}>Connect to get started</h2>
-                    <p style={{ color: "var(--text-secondary)", marginBottom: 24 }}>
-                        You need to log in to create a campaign.
-                    </p>
-                    <button className="btn btn-primary btn-lg" onClick={() => login()}>
-                        Connect with Privy
+                <div className="mx-auto max-w-[1240px] px-6 pt-24 text-center">
+                    <div className="text-5xl mb-4">🔐</div>
+                    <h2 className="text-xl font-bold mb-3">Connect to get started</h2>
+                    <p className="text-white/40 mb-6 text-sm">You need to log in to create a campaign.</p>
+                    <button onClick={() => login()}
+                        className="inline-flex items-center gap-2 px-6 py-3.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-semibold shadow-lg shadow-violet-500/20 hover:shadow-violet-500/35 hover:brightness-110 transition-all">
+                        <Wallet size={16} /> Connect with Privy
                     </button>
                 </div>
             </div>
@@ -87,14 +90,9 @@ export default function CreatePage() {
         setLoading(true);
         try {
             const walletAddress = publicKey?.toBase58();
-            if (!walletAddress) {
-                toast.error("Connect your wallet first");
-                return;
-            }
+            if (!walletAddress) { toast.error("Connect your wallet first"); return; }
 
             const normalizedGstin = orgGstin.toUpperCase().trim();
-
-            // Step 1: Verify GSTIN and fetch hash bytes
             setGstinChecking(true);
             const gst = await verifyOrgGstin(normalizedGstin);
             setGstinChecking(false);
@@ -102,8 +100,6 @@ export default function CreatePage() {
             const creatorPubkey = new PublicKey(walletAddress);
             const provider = new AnchorProvider(connection, {} as any, { commitment: "confirmed" });
             const program = getProgram(provider);
-
-            // Step 2: Check if org PDA already exists on-chain
             const existingOrg = await fetchOrgAccount(program, creatorPubkey);
 
             let orgPdaAddress: string;
@@ -111,8 +107,7 @@ export default function CreatePage() {
             orgPdaAddress = orgPDA.toBase58();
 
             if (!existingOrg) {
-                // Step 3a: Create org on-chain
-                toast.info("Creating org on-chain...", { description: "Please approve the transaction in your wallet." });
+                toast.info("Creating org on-chain...", { description: "Approve the transaction." });
                 const createOrgTx = await buildCreateOrgTx(program, creatorPubkey, gst.gstinHashBytes);
                 await sendTransaction(createOrgTx, connection);
                 toast.success("Org created on-chain! ✅");
@@ -120,70 +115,50 @@ export default function CreatePage() {
                 toast.info("Org already exists on-chain, skipping...");
             }
 
-            // Step 4: Save org metadata to backend
             let orgMeta;
             try {
                 orgMeta = await createOrgMeta({
-                    name: orgName,
-                    category: orgCategory,
-                    description: orgDescription,
-                    twitterHandle: orgTwitter,
-                    gstin: normalizedGstin,
-                    onchainPda: orgPdaAddress,
+                    name: orgName, category: orgCategory, description: orgDescription,
+                    twitterHandle: orgTwitter, gstin: normalizedGstin, onchainPda: orgPdaAddress,
                 });
             } catch (e: any) {
-                // If org already exists in DB (409), that's fine
                 if (e?.response?.status !== 409) throw e;
                 toast.info("Org already registered in backend");
             }
 
-            // Step 5: Save campaign metadata to backend
             const campaign = await createCampaignMeta({
-                title,
-                description,
-                category: orgCategory,
+                title, description, category: orgCategory,
                 tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
                 hasGoal: true,
                 totalGoalLamports: Math.floor(goalSolNum * LAMPORTS_PER_SOL),
                 yieldPolicy,
                 milestones: milestones.map((m) => ({
-                    title: m.title,
-                    description: m.description,
+                    title: m.title, description: m.description,
                     amountLamports: Math.floor(parseFloat(m.amountSol || "0") * LAMPORTS_PER_SOL),
                 })),
             });
 
-            // Step 6: Create project on-chain
             const projectId = generateProjectId();
-            const deadlineUnix = Math.floor(Date.now() / 1000) + 90 * 24 * 3600; // 90 days from now
-
-            toast.info("Creating project on-chain...", { description: "Please approve the transaction in your wallet." });
+            const deadlineUnix = Math.floor(Date.now() / 1000) + 90 * 24 * 3600;
+            toast.info("Creating project on-chain...", { description: "Approve the transaction." });
 
             const { tx: createProjectTx, projectPDA, vaultPDA } = await buildCreateProjectTx(
-                program,
-                creatorPubkey,
-                {
-                    projectId: Array.from(projectId),
-                    hasGoal: true,
-                    totalGoalLamports: Math.floor(goalSolNum * LAMPORTS_PER_SOL),
-                    useMilestonePct: false,
-                    deadlineUnix,
-                    yieldPolicy,
-                    prefrontLamports: 0,
-                    prefrontTranches: 0,
-                    milestones: milestones.map((m) => ({
-                        amount: Math.floor(parseFloat(m.amountSol || "0") * LAMPORTS_PER_SOL),
-                        releasePctBps: 0,
-                        deadline: deadlineUnix,
-                        thresholdBps: 5100,
-                        quorumBps: 1000,
-                    })),
-                }
+                program, creatorPubkey, {
+                projectId: Array.from(projectId),
+                hasGoal: true,
+                totalGoalLamports: Math.floor(goalSolNum * LAMPORTS_PER_SOL),
+                useMilestonePct: false, deadlineUnix, yieldPolicy,
+                prefrontLamports: 0, prefrontTranches: 0,
+                milestones: milestones.map((m) => ({
+                    amount: Math.floor(parseFloat(m.amountSol || "0") * LAMPORTS_PER_SOL),
+                    releasePctBps: 0, deadline: deadlineUnix,
+                    thresholdBps: 5100, quorumBps: 1000,
+                })),
+            }
             );
 
             await sendTransaction(createProjectTx, connection);
 
-            // Step 7: Save PDA addresses back to backend
             await patchCampaignOnchain(campaign.id, {
                 onchainProjectPda: projectPDA.toBase58(),
                 onchainVaultPda: vaultPDA.toBase58(),
@@ -191,10 +166,7 @@ export default function CreatePage() {
                 onchainOrgPda: orgPdaAddress,
             });
 
-            toast.success("Campaign launched on-chain! 🚀", {
-                description: "Your campaign is live with an on-chain escrow vault.",
-            });
-
+            toast.success("Campaign launched on-chain! 🚀", { description: "Your campaign is live." });
             router.push(`/campaign/${campaign.id}`);
         } catch (e: unknown) {
             const message = e instanceof Error ? e.message : "Unknown error";
@@ -206,191 +178,180 @@ export default function CreatePage() {
     };
 
     return (
-        <div>
+        <div className="min-h-screen bg-[#050509] text-white font-['Inter']">
             <Navbar />
-            <main className="container" style={{ paddingTop: 40, paddingBottom: 60, maxWidth: 680 }}>
-                <h1 style={{ fontSize: "2rem", fontWeight: 800, marginBottom: 8 }}>Start a Campaign</h1>
-                <p style={{ color: "var(--text-secondary)", marginBottom: 32 }}>
-                    Create an on-chain milestone-backed fundraiser.
-                </p>
+            <div className="fixed top-0 left-1/2 -translate-x-1/2 w-[700px] h-[500px] bg-[radial-gradient(ellipse,rgba(124,58,237,0.05)_0%,transparent_70%)] pointer-events-none -z-10" />
+
+            <main className="mx-auto max-w-[680px] px-6 pt-10 pb-16">
+                <h1 className="text-3xl font-black tracking-tight bg-gradient-to-r from-violet-400 to-indigo-400 bg-clip-text text-transparent mb-2">
+                    Start a Campaign
+                </h1>
+                <p className="text-white/40 text-sm mb-8">Create an on-chain milestone-backed fundraiser.</p>
 
                 {/* Step indicator */}
-                <div style={{ display: "flex", gap: 8, marginBottom: 36 }}>
+                <div className="flex gap-2 mb-10">
                     {STEPS.map((s, i) => (
-                        <div key={s} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
-                            <div style={{
-                                width: 28, height: 28, borderRadius: "50%",
-                                background: i < step ? "var(--success)" : i === step ? "var(--violet)" : "var(--bg-elevated)",
-                                border: i <= step ? "none" : "1.5px solid var(--border)",
-                                display: "flex", alignItems: "center", justifyContent: "center",
-                                fontSize: 12, fontWeight: 700, color: "#fff",
-                            }}>
+                        <div key={s} className="flex-1 flex flex-col items-center gap-2">
+                            <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${i < step
+                                    ? "bg-emerald-500 text-white"
+                                    : i === step
+                                        ? "bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-lg shadow-violet-500/20"
+                                        : "bg-[#161625] border border-white/[0.08] text-white/30"
+                                }`}>
                                 {i < step ? "✓" : i + 1}
                             </div>
-                            <span style={{ fontSize: 10, color: i === step ? "var(--violet-light)" : "var(--text-muted)", fontWeight: 600, textAlign: "center" }}>
+                            <span className={`text-[10px] font-semibold text-center ${i === step ? "text-violet-400" : "text-white/20"}`}>
                                 {s}
                             </span>
                         </div>
                     ))}
                 </div>
 
-                {/* ── Step 0: Org Check ── */}
+                {/* Step 0: Org */}
                 {step === 0 && (
-                    <div className="card" style={{ padding: 28 }}>
-                        <h2 style={{ fontSize: 17, fontWeight: 700, marginBottom: 20 }}>Organisation Details</h2>
-                        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                            <div>
-                                <label style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 6, display: "block" }}>Organisation Name *</label>
-                                <input className="input" placeholder="e.g. Shaastra, IIT Madras" value={orgName} onChange={(e) => setOrgName(e.target.value)} />
-                            </div>
-                            <div>
-                                <label style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 6, display: "block" }}>Category *</label>
-                                <select className="input" value={orgCategory} onChange={(e) => setOrgCategory(e.target.value)}>
-                                    {Object.entries(ORG_CATEGORY_LABELS).map(([k, v]) => (
-                                        <option key={k} value={k}>{v}</option>
-                                    ))}
+                    <div className="bg-[#0f0f1a] border border-white/[0.06] rounded-2xl p-7 relative overflow-hidden">
+                        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-violet-600/40 to-transparent" />
+                        <h2 className="text-base font-bold mb-6">Organisation Details</h2>
+                        <div className="space-y-4">
+                            <Field label="Organisation Name *">
+                                <input className={inputCls} placeholder="e.g. Shaastra, IIT Madras" value={orgName} onChange={(e) => setOrgName(e.target.value)} />
+                            </Field>
+                            <Field label="Category *">
+                                <select className={selectCls} value={orgCategory} onChange={(e) => setOrgCategory(e.target.value)}>
+                                    {Object.entries(ORG_CATEGORY_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                                 </select>
-                            </div>
-                            <div>
-                                <label style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 6, display: "block" }}>Twitter Handle</label>
-                                <input className="input" placeholder="@shaastra_iitm" value={orgTwitter} onChange={(e) => setOrgTwitter(e.target.value)} />
-                            </div>
-                            <div>
-                                <label style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 6, display: "block" }}>Organisation GSTIN *</label>
-                                <input className="input" placeholder="e.g. 27AABCE1234F1Z5" value={orgGstin} onChange={(e) => setOrgGstin(e.target.value)} style={{ fontFamily: "monospace" }} />
-                                <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4 }}>Required for org verification and on-chain GST hash binding</div>
-                            </div>
-                            <div>
-                                <label style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 6, display: "block" }}>Description</label>
-                                <textarea className="input" placeholder="What does your organisation do?" value={orgDescription} onChange={(e) => setOrgDescription(e.target.value)} />
-                            </div>
+                            </Field>
+                            <Field label="Twitter Handle">
+                                <input className={inputCls} placeholder="@shaastra_iitm" value={orgTwitter} onChange={(e) => setOrgTwitter(e.target.value)} />
+                            </Field>
+                            <Field label="Organisation GSTIN *" hint="Required for on-chain GST hash binding and org verification">
+                                <input className={inputCls + " font-mono"} placeholder="e.g. 27AABCE1234F1Z5" value={orgGstin} onChange={(e) => setOrgGstin(e.target.value)} />
+                            </Field>
+                            <Field label="Description">
+                                <textarea className={inputCls + " min-h-[80px] resize-y"} placeholder="What does your organisation do?" value={orgDescription} onChange={(e) => setOrgDescription(e.target.value)} />
+                            </Field>
                         </div>
                         <button
-                            className="btn btn-primary"
-                            style={{ width: "100%", marginTop: 24 }}
                             disabled={!orgName || !orgGstin.trim()}
                             onClick={() => setStep(1)}
-                        >
+                            className="w-full mt-7 py-3.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-semibold flex items-center justify-center gap-2 shadow-lg shadow-violet-500/20 hover:shadow-violet-500/35 hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed transition-all">
                             Next: Campaign Info <ArrowRight size={15} />
                         </button>
                     </div>
                 )}
 
-                {/* ── Step 1: Campaign Info ── */}
+                {/* Step 1: Campaign */}
                 {step === 1 && (
-                    <div className="card" style={{ padding: 28 }}>
-                        <h2 style={{ fontSize: 17, fontWeight: 700, marginBottom: 20 }}>Campaign Details</h2>
-                        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                            <div>
-                                <label style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 6, display: "block" }}>Campaign Title *</label>
-                                <input className="input" placeholder="e.g. Shaastra 2025 Technical Festival" value={title} onChange={(e) => setTitle(e.target.value)} />
-                            </div>
-                            <div>
-                                <label style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 6, display: "block" }}>Description *</label>
-                                <textarea className="input" style={{ minHeight: 120 }} placeholder="Tell donors what you're raising for..." value={description} onChange={(e) => setDescription(e.target.value)} />
-                            </div>
-                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-                                <div>
-                                    <label style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 6, display: "block" }}>Goal (SOL) *</label>
-                                    <input className="input" type="number" min="0" step="0.1" placeholder="e.g. 40" value={goalSol} onChange={(e) => setGoalSol(e.target.value)} />
-                                </div>
-                                <div>
-                                    <label style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 6, display: "block" }}>Yield Policy</label>
-                                    <select className="input" value={yieldPolicy} onChange={(e) => setYieldPolicy(parseInt(e.target.value))}>
-                                        {Object.entries(YIELD_LABELS).map(([k, v]) => (
-                                            <option key={k} value={k}>{v}</option>
-                                        ))}
+                    <div className="bg-[#0f0f1a] border border-white/[0.06] rounded-2xl p-7 relative overflow-hidden">
+                        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-violet-600/40 to-transparent" />
+                        <h2 className="text-base font-bold mb-6">Campaign Details</h2>
+                        <div className="space-y-4">
+                            <Field label="Campaign Title *">
+                                <input className={inputCls} placeholder="e.g. Shaastra 2025 Technical Festival" value={title} onChange={(e) => setTitle(e.target.value)} />
+                            </Field>
+                            <Field label="Description *">
+                                <textarea className={inputCls + " min-h-[120px] resize-y"} placeholder="Tell donors what you're raising for..." value={description} onChange={(e) => setDescription(e.target.value)} />
+                            </Field>
+                            <div className="grid grid-cols-2 gap-3">
+                                <Field label="Goal (SOL) *">
+                                    <input className={inputCls} type="number" min="0" step="0.1" placeholder="e.g. 40" value={goalSol} onChange={(e) => setGoalSol(e.target.value)} />
+                                </Field>
+                                <Field label="Yield Policy">
+                                    <select className={selectCls} value={yieldPolicy} onChange={(e) => setYieldPolicy(parseInt(e.target.value))}>
+                                        {Object.entries(YIELD_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                                     </select>
-                                </div>
+                                </Field>
                             </div>
-                            <div>
-                                <label style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 6, display: "block" }}>Tags (comma-separated)</label>
-                                <input className="input" placeholder="education, tech, open-source" value={tags} onChange={(e) => setTags(e.target.value)} />
-                            </div>
+                            <Field label="Tags (comma-separated)">
+                                <input className={inputCls} placeholder="education, tech, open-source" value={tags} onChange={(e) => setTags(e.target.value)} />
+                            </Field>
                         </div>
-                        <div style={{ display: "flex", gap: 10, marginTop: 24 }}>
-                            <button className="btn btn-ghost" onClick={() => setStep(0)}><ArrowLeft size={15} /> Back</button>
-                            <button className="btn btn-primary" style={{ flex: 1 }} disabled={!title || !description || !goalSol} onClick={() => setStep(2)}>
+                        <div className="flex gap-3 mt-7">
+                            <button onClick={() => setStep(0)}
+                                className="px-5 py-3 rounded-xl border border-white/[0.08] text-white/50 text-sm font-semibold hover:bg-white/5 transition-all flex items-center gap-1.5">
+                                <ArrowLeft size={15} /> Back
+                            </button>
+                            <button disabled={!title || !description || !goalSol} onClick={() => setStep(2)}
+                                className="flex-1 py-3.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-semibold flex items-center justify-center gap-2 shadow-lg shadow-violet-500/20 hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed transition-all">
                                 Next: Milestones <ArrowRight size={15} />
                             </button>
                         </div>
                     </div>
                 )}
 
-                {/* ── Step 2: Milestones ── */}
+                {/* Step 2: Milestones */}
                 {step === 2 && (
                     <div>
-                        <div style={{
-                            padding: "12px 16px", borderRadius: 10, marginBottom: 20,
-                            background: "rgba(124,58,237,0.08)", border: "1px solid rgba(124,58,237,0.2)",
-                            fontSize: 13, color: "var(--text-secondary)", display: "flex", gap: 8,
-                        }}>
-                            <Info size={15} color="var(--violet-light)" style={{ flexShrink: 0, marginTop: 1 }} />
-                            Milestone amounts must sum to the total goal ({goalSol} SOL). Current sum: {totalMilestoneSol.toFixed(2)} SOL.
+                        <div className="flex items-start gap-2.5 p-4 rounded-xl bg-violet-500/[0.06] border border-violet-500/20 mb-5 text-sm text-white/50">
+                            <Info size={15} className="text-violet-400 shrink-0 mt-0.5" />
+                            Milestone amounts must sum to {goalSol} SOL. Current: {totalMilestoneSol.toFixed(2)} SOL.
                         </div>
-                        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                        <div className="space-y-4">
                             {milestones.map((m, i) => (
-                                <div key={i} className="card" style={{ padding: 20 }}>
-                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-                                        <span style={{ fontSize: 13, fontWeight: 700, color: "var(--violet-light)" }}>Milestone {i + 1}</span>
+                                <div key={i} className="bg-[#0f0f1a] border border-white/[0.06] rounded-2xl p-5 relative overflow-hidden">
+                                    <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-violet-600/30 to-transparent" />
+                                    <div className="flex justify-between items-center mb-4">
+                                        <span className="text-xs font-bold text-violet-400">Milestone {i + 1}</span>
                                         {milestones.length > 1 && (
-                                            <button onClick={() => removeMilestone(i)} className="btn btn-danger btn-sm">
+                                            <button onClick={() => removeMilestone(i)} className="p-1.5 rounded-lg text-red-400/60 hover:bg-red-500/10 hover:text-red-400 transition-all">
                                                 <Trash2 size={13} />
                                             </button>
                                         )}
                                     </div>
-                                    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                                        <input className="input" placeholder="Milestone title" value={m.title} onChange={(e) => updateMilestone(i, "title", e.target.value)} />
-                                        <textarea className="input" style={{ minHeight: 70 }} placeholder="What needs to happen for this milestone?" value={m.description} onChange={(e) => updateMilestone(i, "description", e.target.value)} />
-                                        <input className="input" type="number" min="0" step="0.1" placeholder="Amount (SOL)" value={m.amountSol} onChange={(e) => updateMilestone(i, "amountSol", e.target.value)} />
+                                    <div className="space-y-3">
+                                        <input className={inputCls} placeholder="Milestone title" value={m.title} onChange={(e) => updateMilestone(i, "title", e.target.value)} />
+                                        <textarea className={inputCls + " min-h-[70px] resize-y"} placeholder="What needs to happen?" value={m.description} onChange={(e) => updateMilestone(i, "description", e.target.value)} />
+                                        <input className={inputCls} type="number" min="0" step="0.1" placeholder="Amount (SOL)" value={m.amountSol} onChange={(e) => updateMilestone(i, "amountSol", e.target.value)} />
                                     </div>
                                 </div>
                             ))}
-                            <button onClick={addMilestone} className="btn btn-ghost" style={{ width: "100%" }}>
+                            <button onClick={addMilestone}
+                                className="w-full py-3 rounded-xl border border-dashed border-white/[0.08] text-white/30 text-sm font-semibold hover:bg-white/[0.03] hover:text-white/50 transition-all flex items-center justify-center gap-2">
                                 <Plus size={15} /> Add Milestone
                             </button>
                         </div>
-                        <div style={{ display: "flex", gap: 10, marginTop: 24 }}>
-                            <button className="btn btn-ghost" onClick={() => setStep(1)}><ArrowLeft size={15} /> Back</button>
-                            <button
-                                className="btn btn-primary"
-                                style={{ flex: 1 }}
-                                disabled={!milestonesValid || milestones.some((m) => !m.title)}
-                                onClick={() => setStep(3)}
-                            >
+                        <div className="flex gap-3 mt-7">
+                            <button onClick={() => setStep(1)}
+                                className="px-5 py-3 rounded-xl border border-white/[0.08] text-white/50 text-sm font-semibold hover:bg-white/5 transition-all flex items-center gap-1.5">
+                                <ArrowLeft size={15} /> Back
+                            </button>
+                            <button disabled={!milestonesValid || milestones.some((m) => !m.title)} onClick={() => setStep(3)}
+                                className="flex-1 py-3.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-semibold flex items-center justify-center gap-2 shadow-lg shadow-violet-500/20 hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed transition-all">
                                 Review & Launch <ArrowRight size={15} />
                             </button>
                         </div>
                     </div>
                 )}
 
-                {/* ── Step 3: Review ── */}
+                {/* Step 3: Review */}
                 {step === 3 && (
-                    <div className="card" style={{ padding: 28 }}>
-                        <h2 style={{ fontSize: 17, fontWeight: 700, marginBottom: 20 }}>Review & Launch</h2>
-                        <div style={{ display: "flex", flexDirection: "column", gap: 14, marginBottom: 24 }}>
+                    <div className="bg-[#0f0f1a] border border-white/[0.06] rounded-2xl p-7 relative overflow-hidden">
+                        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-violet-600/40 to-transparent" />
+                        <h2 className="text-base font-bold mb-6">Review & Launch</h2>
+                        <div className="space-y-3 mb-6">
                             {[
                                 { label: "Org", value: `${orgName} (${ORG_CATEGORY_LABELS[orgCategory]})` },
-                                { label: "Campaign Title", value: title },
+                                { label: "Campaign", value: title },
                                 { label: "Goal", value: `${goalSol} SOL` },
-                                { label: "Yield Policy", value: YIELD_LABELS[yieldPolicy] },
-                                { label: "Milestones", value: `${milestones.length} milestone(s)` },
+                                { label: "Yield", value: YIELD_LABELS[yieldPolicy] },
+                                { label: "Milestones", value: `${milestones.length} phase(s)` },
                             ].map(({ label, value }) => (
-                                <div key={label} style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid var(--border)", paddingBottom: 10 }}>
-                                    <span style={{ fontSize: 13, color: "var(--text-muted)" }}>{label}</span>
-                                    <span style={{ fontSize: 13, fontWeight: 600, textAlign: "right", maxWidth: "60%" }}>{value}</span>
+                                <div key={label} className="flex justify-between items-center py-2.5 border-b border-white/[0.04]">
+                                    <span className="text-xs text-white/30">{label}</span>
+                                    <span className="text-sm font-semibold text-right max-w-[60%]">{value}</span>
                                 </div>
                             ))}
                         </div>
-                        <div style={{
-                            padding: 12, background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.2)",
-                            borderRadius: 10, fontSize: 12, color: "var(--text-secondary)", marginBottom: 20,
-                        }}>
-                            ⚠️ After creating the campaign metadata, you&apos;ll need to call <code>create_project</code> on-chain with your wallet to activate the escrow vault.
+                        <div className="flex items-start gap-2.5 p-4 rounded-xl bg-amber-500/[0.05] border border-amber-500/20 mb-6 text-xs text-white/40">
+                            ⚠️ After creating the campaign metadata, you&apos;ll sign a transaction to activate the on-chain escrow vault.
                         </div>
-                        <div style={{ display: "flex", gap: 10 }}>
-                            <button className="btn btn-ghost" onClick={() => setStep(2)}><ArrowLeft size={15} /> Back</button>
-                            <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleSubmit} disabled={loading || gstinChecking}>
+                        <div className="flex gap-3">
+                            <button onClick={() => setStep(2)}
+                                className="px-5 py-3 rounded-xl border border-white/[0.08] text-white/50 text-sm font-semibold hover:bg-white/5 transition-all flex items-center gap-1.5">
+                                <ArrowLeft size={15} /> Back
+                            </button>
+                            <button onClick={handleSubmit} disabled={loading || gstinChecking}
+                                className="flex-1 py-3.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-bold flex items-center justify-center gap-2 shadow-lg shadow-violet-500/20 hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed transition-all">
                                 {loading || gstinChecking ? "Creating..." : "🚀 Launch Campaign"}
                             </button>
                         </div>

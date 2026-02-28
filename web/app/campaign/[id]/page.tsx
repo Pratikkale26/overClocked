@@ -2,7 +2,7 @@
 
 import { use, useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { ExternalLink, Users, TrendingUp, Shield, AlertCircle } from "lucide-react";
+import { ExternalLink, Users, TrendingUp, Shield, AlertCircle, Heart } from "lucide-react";
 import { Navbar } from "../../../components/layout/Navbar";
 import { DonateModal } from "../../../components/campaigns/DonateModal";
 import { MilestoneTimeline } from "../../../components/campaigns/MilestoneTimeline";
@@ -12,15 +12,13 @@ import {
   fetchCampaign, fetchMilestoneProof, fetchMilestoneUpdates,
   type Campaign, type Milestone, type MilestoneProof, type MilestoneUpdate,
 } from "../../../lib/api";
-import { formatGoalProgress, formatSol } from "../../../lib/utils";
+import { formatGoalProgress, formatSol, shortenAddress } from "../../../lib/utils";
 
 export default function CampaignDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [loading, setLoading] = useState(true);
   const [donateOpen, setDonateOpen] = useState(false);
-
-  // For the active milestone under review
   const [activeProof, setActiveProof] = useState<MilestoneProof | null>(null);
   const [activeUpdates, setActiveUpdates] = useState<MilestoneUpdate[]>([]);
   const [activeMilestone, setActiveMilestone] = useState<Milestone | null>(null);
@@ -29,9 +27,7 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
     try {
       const c = await fetchCampaign(id);
       setCampaign(c);
-      // Find the active milestone (UNDER_REVIEW or most recent PENDING)
-      const underReview = c.milestones?.find((m) => m.state === "UNDER_REVIEW");
-      const target = underReview ?? c.milestones?.find((m) => m.state === "PENDING") ?? c.milestones?.[0];
+      const target = c.milestones?.find((m) => m.state === "UNDER_REVIEW") ?? c.milestones?.find((m) => m.state === "PENDING") ?? c.milestones?.[0];
       if (target) {
         setActiveMilestone(target);
         const [proof, updates] = await Promise.allSettled([
@@ -41,22 +37,18 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
         setActiveProof(proof.status === "fulfilled" ? proof.value : null);
         setActiveUpdates(updates.status === "fulfilled" ? updates.value : []);
       }
-    } catch {
-      setCampaign(null);
-    } finally {
-      setLoading(false);
-    }
+    } catch { setCampaign(null); } finally { setLoading(false); }
   }, [id]);
 
   useEffect(() => { load(); }, [load]);
 
   if (loading) {
     return (
-      <div>
+      <div className="min-h-screen bg-[#050509] text-white">
         <Navbar />
-        <main className="container" style={{ paddingTop: 44 }}>
-          <div className="skeleton" style={{ height: 220, borderRadius: 16, marginBottom: 20 }} />
-          <div className="skeleton" style={{ height: 160, borderRadius: 16 }} />
+        <main className="mx-auto max-w-[1240px] px-6 pt-12">
+          <div className="skeleton h-56 rounded-2xl mb-5" />
+          <div className="skeleton h-40 rounded-2xl" />
         </main>
       </div>
     );
@@ -64,11 +56,16 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
 
   if (!campaign) {
     return (
-      <div>
+      <div className="min-h-screen bg-[#050509] text-white">
         <Navbar />
-        <main className="container" style={{ paddingTop: 60, textAlign: "center" }}>
-          <h2>Campaign not found</h2>
-          <Link href="/explore"><button className="btn btn-primary" style={{ marginTop: 14 }}>Back to Explore</button></Link>
+        <main className="mx-auto max-w-[1240px] px-6 pt-20 text-center">
+          <div className="text-5xl mb-4">🔍</div>
+          <h2 className="text-xl font-bold mb-3">Campaign not found</h2>
+          <Link href="/explore">
+            <button className="px-6 py-3 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-semibold">
+              Back to Explore
+            </button>
+          </Link>
         </main>
       </div>
     );
@@ -77,41 +74,56 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
   const progress = formatGoalProgress(campaign.raisedLamports, campaign.totalGoalLamports);
   const completionRate = campaign.org ? Math.round((campaign.org.completionRateBps ?? 0) / 100) : 0;
   const trustTier = completionRate >= 80 ? "GOLD" : completionRate >= 50 ? "SILVER" : "BRONZE";
-  const tierColor = trustTier === "GOLD" ? "#f59e0b" : trustTier === "SILVER" ? "#94a3b8" : "#a16207";
+  const tierClr = trustTier === "GOLD" ? "text-amber-400" : trustTier === "SILVER" ? "text-slate-400" : "text-amber-700";
+
+  const stateClasses: Record<string, string> = {
+    ACTIVE: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+    COMPLETED: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+    FAILED: "bg-red-500/10 text-red-400 border-red-500/20",
+    FROZEN: "bg-indigo-500/10 text-indigo-400 border-indigo-500/20",
+  };
 
   return (
-    <div>
+    <div className="min-h-screen bg-[#050509] text-white font-['Inter']">
       <Navbar />
-      <main className="container" style={{ paddingTop: 40, paddingBottom: 60 }}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: 24, alignItems: "start" }}>
+
+      {/* Ambient glow */}
+      <div className="fixed top-0 left-1/2 -translate-x-1/2 w-[700px] h-[500px] bg-[radial-gradient(ellipse,rgba(124,58,237,0.06)_0%,transparent_70%)] pointer-events-none -z-10" />
+
+      <main className="mx-auto max-w-[1240px] px-6 pt-10 pb-16">
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6 items-start">
 
           {/* ── Left column ── */}
-          <div style={{ minWidth: 0 }}>
+          <div className="min-w-0 space-y-5">
 
             {/* Hero card */}
-            <div className="card" style={{ padding: 28, marginBottom: 20 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", gap: 14, flexWrap: "wrap", marginBottom: 16 }}>
-                <div style={{ flex: 1, minWidth: 200 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: "var(--violet-light)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>
-                    {campaign.org?.name}
-                  </div>
-                  <h1 style={{ fontSize: "1.75rem", fontWeight: 800, lineHeight: 1.25, marginBottom: 12 }}>
+            <div className="bg-[#0f0f1a] border border-white/[0.06] rounded-2xl p-7 relative overflow-hidden">
+              <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-violet-600/40 via-indigo-500/20 to-transparent" />
+
+              <div className="flex justify-between gap-4 flex-wrap mb-5">
+                <div className="flex-1 min-w-[200px]">
+                  {campaign.org && (
+                    <p className="text-[11px] font-semibold text-violet-400/80 uppercase tracking-widest mb-2">
+                      {campaign.org.name}
+                    </p>
+                  )}
+                  <h1 className="text-2xl font-extrabold tracking-tight leading-snug mb-3">
                     {campaign.title}
                   </h1>
-                  <p style={{ color: "var(--text-secondary)", lineHeight: 1.65, fontSize: 15 }}>
+                  <p className="text-[15px] text-white/50 leading-relaxed">
                     {campaign.description}
                   </p>
                 </div>
-                <span className={`badge badge-${campaign.state.toLowerCase()}`} style={{ height: "fit-content", flexShrink: 0 }}>
+                <span className={`self-start text-[10px] font-bold uppercase tracking-wider px-3 py-1.5 rounded-full border ${stateClasses[campaign.state] ?? ""}`}>
                   {campaign.state}
                 </span>
               </div>
 
               {/* Tags */}
               {campaign.tags?.length > 0 && (
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 18 }}>
+                <div className="flex flex-wrap gap-1.5 mb-5">
                   {campaign.tags.map((t) => (
-                    <span key={t} style={{ fontSize: 11, padding: "3px 10px", borderRadius: 99, background: "var(--bg-elevated)", color: "var(--text-secondary)", border: "1px solid var(--border)" }}>
+                    <span key={t} className="text-[11px] px-2.5 py-1 rounded-full bg-white/[0.04] border border-white/[0.06] text-white/40">
                       {t}
                     </span>
                   ))}
@@ -119,125 +131,104 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
               )}
 
               {/* Progress */}
-              <div style={{ marginBottom: 6, display: "flex", justifyContent: "space-between", fontSize: 13, color: "var(--text-secondary)" }}>
-                <span><strong style={{ color: "var(--text-primary)", fontSize: 16 }}>{formatSol(campaign.raisedLamports)}</strong> raised</span>
-                <span>Goal: {formatSol(campaign.totalGoalLamports)}</span>
+              <div className="flex justify-between text-sm mb-2">
+                <span>
+                  <strong className="text-base text-white font-extrabold">{formatSol(campaign.raisedLamports)}</strong>
+                  <span className="text-white/40 ml-1.5">raised</span>
+                </span>
+                <span className="text-white/30">Goal: {formatSol(campaign.totalGoalLamports)}</span>
               </div>
-              <div className="progress-track" style={{ height: 10, marginBottom: 6 }}>
-                <div className="progress-fill" style={{ width: `${progress}%` }} />
+              <div className="h-2.5 w-full bg-white/[0.04] rounded-full overflow-hidden mb-2">
+                <div className="h-full rounded-full bg-gradient-to-r from-violet-600 to-violet-400 transition-all duration-700 progress-glow" style={{ width: `${progress}%` }} />
               </div>
-              <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
-                {progress.toFixed(0)}% funded · {campaign._count?.donations ?? 0} donors
-              </div>
+              <p className="text-xs text-white/25">{progress.toFixed(0)}% funded · {campaign._count?.donations ?? 0} donors</p>
             </div>
 
-            {/* Voting panel — shown when UNDER_REVIEW */}
+            {/* Voting panel */}
             {activeMilestone && activeMilestone.state === "UNDER_REVIEW" && (
-              <VotingPanel
-                milestone={activeMilestone}
-                proof={activeProof}
-                campaign={campaign}
-                onVoted={load}
-              />
+              <VotingPanel milestone={activeMilestone} proof={activeProof} campaign={campaign} onVoted={load} />
             )}
 
-            {/* DPR Activity Timeline */}
-            <div className="card" style={{ padding: 24, marginBottom: 20 }}>
-              <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 18 }}>
-                📋 Activity Log
-                <span style={{ fontSize: 12, color: "var(--text-muted)", fontWeight: 400, marginLeft: 10 }}>
-                  Live proof-of-history — updated like git commits
-                </span>
-              </h2>
-              <DprTimeline updates={activeUpdates} />
-              <Link href={`/campaign/${campaign.id}/audit`} style={{ display: "block", marginTop: 16, textAlign: "center" }}>
-                <button className="btn btn-ghost btn-sm" style={{ width: "100%" }}>
+            {/* Activity log */}
+            <div className="bg-[#0f0f1a] border border-white/[0.06] rounded-2xl p-6">
+              <div className="flex items-center justify-between mb-5">
+                <h2 className="text-sm font-bold text-white/70">
+                  📋 Activity Log
+                  <span className="text-xs text-white/25 font-normal ml-2">Proof-of-history chain</span>
+                </h2>
+              </div>
+              <DprTimeline updates={activeUpdates} title="" />
+              <Link href={`/campaign/${campaign.id}/audit`} className="block mt-5">
+                <button className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-white/40 text-sm font-semibold hover:bg-white/[0.06] transition-all">
                   <ExternalLink size={13} /> View Full Audit Chain
                 </button>
               </Link>
             </div>
 
-            {/* DPR Milestone phases */}
+            {/* Milestones */}
             <MilestoneTimeline milestones={campaign.milestones ?? []} />
           </div>
 
           {/* ── Right column ── */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+          <div className="space-y-5">
 
             {/* Donate card */}
-            <div className="card" style={{ padding: 22 }}>
-              <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 16 }}>Support this campaign</h3>
+            <div className="bg-[#0f0f1a] border border-white/[0.06] rounded-2xl p-6 relative overflow-hidden">
+              <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-violet-600/40 to-transparent" />
+              <h3 className="text-sm font-bold mb-4">Support this campaign</h3>
               <button
-                className="btn btn-primary"
-                style={{ width: "100%", padding: "14px" }}
                 onClick={() => setDonateOpen(true)}
                 disabled={campaign.state !== "ACTIVE"}
+                className="w-full py-3.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-bold flex items-center justify-center gap-2 shadow-lg shadow-violet-500/20 hover:shadow-violet-500/35 hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
               >
-                {campaign.state === "ACTIVE" ? "Donate SOL / UPI" : "Campaign Closed"}
+                <Heart size={15} /> {campaign.state === "ACTIVE" ? "Donate SOL" : "Campaign Closed"}
               </button>
-              <div style={{ fontSize: 11, color: "var(--text-muted)", textAlign: "center", marginTop: 10, lineHeight: 1.6 }}>
-                Funds go into an on-chain escrow vault.
-                Released only after donor voting approves each milestone.
-              </div>
-              {/* Yield hint */}
-              <div style={{
-                marginTop: 14, padding: "10px 14px",
-                background: "rgba(34,197,94,0.06)",
-                border: "1px solid rgba(34,197,94,0.2)",
-                borderRadius: 10, fontSize: 12,
-              }}>
-                <span style={{ color: "var(--success)", fontWeight: 700 }}>💰 8–12% APY</span>
-                <span style={{ color: "var(--text-secondary)", marginLeft: 6 }}>
-                  Your locked SOL earns yield while it waits.
-                </span>
+              <p className="text-[11px] text-white/25 text-center mt-3 leading-relaxed">
+                Funds go into an on-chain escrow vault. Released only after donor voting approves each milestone.
+              </p>
+              <div className="mt-4 p-3 rounded-xl bg-emerald-500/[0.05] border border-emerald-500/15">
+                <span className="text-emerald-400 text-xs font-bold">💰 8–12% APY</span>
+                <span className="text-white/30 text-xs ml-2">Locked SOL earns yield</span>
               </div>
             </div>
 
-            {/* Org reputation card */}
+            {/* Org card */}
             {campaign.org && (
-              <div className="card" style={{ padding: 22 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
-                  {campaign.org.logoUrl ? (
-                    <img src={campaign.org.logoUrl} alt={campaign.org.name} style={{ width: 44, height: 44, borderRadius: 10, objectFit: "cover" }} />
-                  ) : (
-                    <div style={{
-                      width: 44, height: 44, borderRadius: 10,
-                      background: "var(--bg-elevated)",
-                      display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20,
-                    }}>🏢</div>
-                  )}
+              <div className="bg-[#0f0f1a] border border-white/[0.06] rounded-2xl p-6">
+                <div className="flex items-center gap-3 mb-5">
+                  <div className="w-11 h-11 rounded-xl bg-[#161625] flex items-center justify-center text-xl">
+                    {campaign.org.logoUrl
+                      ? <img src={campaign.org.logoUrl} alt="" className="w-full h-full rounded-xl object-cover" />
+                      : "🏢"}
+                  </div>
                   <div>
-                    <div style={{ fontWeight: 700, fontSize: 14 }}>{campaign.org.name}</div>
-                    <div style={{ fontSize: 11, color: tierColor, fontWeight: 700 }}>⬡ {trustTier} tier</div>
+                    <p className="font-bold text-sm">{campaign.org.name}</p>
+                    <p className={`text-xs font-bold ${tierClr}`}>⬡ {trustTier} tier</p>
                   </div>
                 </div>
 
-                {/* GSTIN verification */}
                 {campaign.org.gstinVerified && (
-                  <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 12, padding: "8px 12px", background: "rgba(34,197,94,0.06)", borderRadius: 8, border: "1px solid rgba(34,197,94,0.2)" }}>
-                    <Shield size={13} style={{ color: "var(--success)" }} />
-                    <span style={{ fontSize: 12, color: "var(--success)" }}>GST-verified organization</span>
+                  <div className="flex items-center gap-2 p-2.5 rounded-lg bg-emerald-500/[0.05] border border-emerald-500/15 mb-4 text-xs text-emerald-400">
+                    <Shield size={12} /> GST-verified organization
                   </div>
                 )}
 
-                {/* Stats */}
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16 }}>
+                <div className="grid grid-cols-2 gap-2 mb-4">
                   {[
                     { label: "Campaigns", value: campaign.org.campaignsCreated },
                     { label: "Completed", value: campaign.org.campaignsCompleted },
-                    { label: "Success Rate", value: `${completionRate}%` },
-                    { label: "Total Raised", value: formatSol(campaign.org.totalRaisedLamports) },
+                    { label: "Success", value: `${completionRate}%` },
+                    { label: "Raised", value: formatSol(campaign.org.totalRaisedLamports) },
                   ].map((s) => (
-                    <div key={s.label} style={{ padding: "10px 12px", background: "var(--bg-elevated)", borderRadius: 8, textAlign: "center" }}>
-                      <div style={{ fontSize: 15, fontWeight: 800 }}>{s.value}</div>
-                      <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 2 }}>{s.label}</div>
+                    <div key={s.label} className="p-3 rounded-xl bg-white/[0.02] text-center">
+                      <p className="text-sm font-extrabold">{s.value}</p>
+                      <p className="text-[10px] text-white/25 mt-0.5">{s.label}</p>
                     </div>
                   ))}
                 </div>
 
-                {/* On-chain PDA */}
                 {campaign.org.onchainPda && (
-                  <div style={{ fontSize: 10, fontFamily: "monospace", color: "var(--text-muted)", wordBreak: "break-all", padding: "8px 10px", background: "var(--bg-elevated)", borderRadius: 8 }}>
+                  <div className="text-[10px] font-mono text-white/15 p-2.5 rounded-lg bg-white/[0.02] break-all mb-3">
                     On-chain: {campaign.org.onchainPda}
                   </div>
                 )}
@@ -245,17 +236,16 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
                 {campaign.org.twitterHandle && (
                   <a
                     href={`https://twitter.com/${campaign.org.twitterHandle.replace("@", "")}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 12, fontSize: 12, color: "var(--violet-light)" }}
+                    target="_blank" rel="noreferrer"
+                    className="flex items-center gap-1.5 text-xs text-violet-400 hover:text-violet-300 transition-colors mt-2"
                   >
                     <Users size={12} /> {campaign.org.twitterHandle}
                   </a>
                 )}
 
                 {(campaign.org?.walletAddress || campaign.org?.id) && (
-                  <Link href={`/org/${campaign.org.walletAddress ?? campaign.org.id}`}>
-                    <button className="btn btn-ghost btn-sm" style={{ width: "100%", marginTop: 12 }}>
+                  <Link href={`/org/${campaign.org.walletAddress ?? campaign.org.id}`} className="block mt-4">
+                    <button className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-white/40 text-sm font-semibold hover:bg-white/[0.06] transition-all">
                       <TrendingUp size={13} /> View Full Profile
                     </button>
                   </Link>
@@ -265,17 +255,12 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
 
             {/* Unregistered vendor warning */}
             {activeProof?.isUnregisteredVendor && (
-              <div style={{
-                padding: "14px 16px",
-                background: "rgba(245,158,11,0.06)",
-                border: "1px solid rgba(245,158,11,0.25)",
-                borderRadius: 12,
-              }}>
-                <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
-                  <AlertCircle size={14} style={{ color: "var(--warning)", flexShrink: 0 }} />
-                  <div style={{ fontSize: 12, color: "var(--warning)" }}>
-                    <strong>Unregistered vendor</strong> — this vendor is below the GST registration threshold (₹40L turnover). Verify manually before voting.
-                  </div>
+              <div className="p-4 rounded-2xl bg-amber-500/[0.04] border border-amber-500/20">
+                <div className="flex gap-2.5 items-start">
+                  <AlertCircle size={14} className="text-amber-400 shrink-0 mt-0.5" />
+                  <p className="text-xs text-amber-400 leading-relaxed">
+                    <strong>Unregistered vendor</strong> — below the GST registration threshold (₹40L). Verify manually before voting.
+                  </p>
                 </div>
               </div>
             )}

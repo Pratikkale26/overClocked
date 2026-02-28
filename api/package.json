@@ -3,8 +3,18 @@
   "module": "index.ts",
   "type": "module",
   "private": true,
+  "scripts": {
+    "dev": "bun --watch src/index.ts",
+    "start": "bun src/index.ts",
+    "build": "bun build src/index.ts --outdir dist --target bun",
+    "typecheck": "tsc --noEmit",
+    "db:generate": "bunx prisma generate",
+    "db:push": "bunx prisma db push",
+    "db:migrate": "bunx prisma migrate dev"
+  },
   "devDependencies": {
     "@types/bun": "latest",
+    "@types/pg": "^8.16.0",
     "prisma": "^7.4.2"
   },
   "peerDependencies": {
@@ -12,8 +22,10 @@
   },
   "dependencies": {
     "@prisma/adapter-libsql": "^7.4.2",
+    "@prisma/adapter-pg": "^7.4.2",
     "@prisma/client": "^7.4.2",
     "@types/express": "^5.0.6",
-    "express": "^5.2.1"
+    "express": "^5.2.1",
+    "pg": "^8.19.0"
   }
 }

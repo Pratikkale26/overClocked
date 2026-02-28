@@ -9,11 +9,12 @@ const normalizedBaseUrl = trimmedBaseUrl.endsWith("/api")
 const api = axios.create({
     baseURL: normalizedBaseUrl,
 });
+const API_TOKEN_STORAGE_KEY = "credence:privy-access-token";
 
 // Attach Privy token to every request if stored in localStorage
 api.interceptors.request.use((config) => {
     if (typeof window !== "undefined") {
-        const token = localStorage.getItem("privy:token");
+        const token = localStorage.getItem(API_TOKEN_STORAGE_KEY);
         if (token) config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
@@ -118,8 +119,15 @@ export async function loginWithPrivy(privyToken: string) {
 // ── Milestone / Proof / DPR helpers ───────────────────────────────────
 
 export async function fetchMilestoneProof(milestoneId: string) {
-    const { data } = await api.get(`/milestones/${milestoneId}/proof`);
-    return data.proof as MilestoneProof | null;
+    try {
+        const { data } = await api.get(`/milestones/${milestoneId}/proof`);
+        return data.proof as MilestoneProof | null;
+    } catch (err: unknown) {
+        if (axios.isAxiosError(err) && err.response?.status === 404) {
+            return null;
+        }
+        throw err;
+    }
 }
 
 export async function fetchMilestoneUpdates(milestoneId: string) {
@@ -242,6 +250,7 @@ export interface User {
     privyId: string;
     walletAddress?: string;
     email?: string;
+    twitterHandle?: string;
     org?: Org;
 }
 

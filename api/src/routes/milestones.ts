@@ -15,6 +15,15 @@ function firstParam(value: string | string[] | undefined): string | undefined {
     return Array.isArray(value) ? value[0] : value;
 }
 
+async function isMilestoneOwner(milestoneId: string, privyId: string): Promise<boolean> {
+    const milestone = await prisma.milestone.findUnique({
+        where: { id: milestoneId },
+        include: { campaign: { include: { org: { include: { user: true } } } } },
+    });
+    if (!milestone) return false;
+    return milestone.campaign.org.user.privyId === privyId;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Proof Submission (GST-verified)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -35,6 +44,11 @@ milestonesRouter.post("/:id/proof/presign", requireAuth, async (req: AuthedReque
         const milestoneId = firstParam(req.params.id);
         if (!milestoneId) {
             res.status(400).json({ error: "milestone id is required" });
+            return;
+        }
+        const isOwner = await isMilestoneOwner(milestoneId, req.user!.privyId);
+        if (!isOwner) {
+            res.status(403).json({ error: "Only the campaign owner can upload milestone proof files" });
             return;
         }
         const key = `milestones/${milestoneId}/proof/${Date.now()}-${fileName}`;
@@ -97,6 +111,10 @@ milestonesRouter.post("/:id/proof", requireAuth, async (req: AuthedRequest, res)
 
         if (!milestone) {
             res.status(404).json({ error: "Milestone not found" });
+            return;
+        }
+        if (milestone.campaign.org.user.privyId !== req.user!.privyId) {
+            res.status(403).json({ error: "Only the campaign owner can submit milestone proof" });
             return;
         }
         if (milestone.proof) {
@@ -235,14 +253,21 @@ milestonesRouter.get("/:id/proof", async (req, res) => {
             res.status(400).json({ error: "milestone id is required" });
             return;
         }
-        const proof = await prisma.milestoneProof.findUnique({
-            where: { milestoneId },
+        const milestone = await prisma.milestone.findUnique({
+            where: { id: milestoneId },
+            include: { proof: true },
         });
 
-        if (!proof) {
-            res.status(404).json({ error: "No proof submitted yet" });
+        if (!milestone) {
+            res.status(404).json({ error: "Milestone not found" });
             return;
         }
+
+        if (!milestone.proof) {
+            res.json({ proof: null });
+            return;
+        }
+        const proof = milestone.proof;
 
         res.json({
             proof: {
@@ -265,6 +290,18 @@ milestonesRouter.post("/:id/proof/onchain-confirmed", requireAuth, async (req: A
         const milestoneId = firstParam(req.params.id);
         if (!milestoneId) {
             res.status(400).json({ error: "milestone id is required" });
+            return;
+        }
+        const milestone = await prisma.milestone.findUnique({
+            where: { id: milestoneId },
+            include: { campaign: { include: { org: { include: { user: true } } } } },
+        });
+        if (!milestone) {
+            res.status(404).json({ error: "Milestone not found" });
+            return;
+        }
+        if (milestone.campaign.org.user.privyId !== req.user!.privyId) {
+            res.status(403).json({ error: "Only the campaign owner can confirm on-chain proof" });
             return;
         }
         const { onchainProofUri, txSignature } = req.body;
@@ -320,6 +357,10 @@ milestonesRouter.post("/:id/updates", requireAuth, async (req: AuthedRequest, re
             res.status(404).json({ error: "Milestone not found" });
             return;
         }
+        if (milestone.campaign.org.user.privyId !== req.user!.privyId) {
+            res.status(403).json({ error: "Only the campaign owner can post milestone updates" });
+            return;
+        }
 
         // Compute content hash for authenticity
         const contentHash = crypto
@@ -356,6 +397,11 @@ milestonesRouter.post("/:id/updates/presign", requireAuth, async (req: AuthedReq
         const milestoneId = firstParam(req.params.id);
         if (!milestoneId) {
             res.status(400).json({ error: "milestone id is required" });
+            return;
+        }
+        const isOwner = await isMilestoneOwner(milestoneId, req.user!.privyId);
+        if (!isOwner) {
+            res.status(403).json({ error: "Only the campaign owner can upload milestone update media" });
             return;
         }
         const key = `milestones/${milestoneId}/updates/${Date.now()}-${fileName}`;

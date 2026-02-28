@@ -3,6 +3,7 @@
 import { use, useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { ExternalLink, Users, TrendingUp, Shield, AlertCircle, Heart } from "lucide-react";
+import { useWallet } from "@solana/wallet-adapter-react";
 import { Navbar } from "../../../components/layout/Navbar";
 import { DonateModal } from "../../../components/campaigns/DonateModal";
 import { MilestoneTimeline } from "../../../components/campaigns/MilestoneTimeline";
@@ -12,10 +13,11 @@ import {
   fetchCampaign, fetchMilestoneProof, fetchMilestoneUpdates,
   type Campaign, type Milestone, type MilestoneProof, type MilestoneUpdate,
 } from "../../../lib/api";
-import { formatGoalProgress, formatSol, shortenAddress } from "../../../lib/utils";
+import { formatGoalProgress, formatSol } from "../../../lib/utils";
 
 export default function CampaignDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  const { publicKey } = useWallet();
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [loading, setLoading] = useState(true);
   const [donateOpen, setDonateOpen] = useState(false);
@@ -75,6 +77,9 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
   const completionRate = campaign.org ? Math.round((campaign.org.completionRateBps ?? 0) / 100) : 0;
   const trustTier = completionRate >= 80 ? "GOLD" : completionRate >= 50 ? "SILVER" : "BRONZE";
   const tierClr = trustTier === "GOLD" ? "text-amber-400" : trustTier === "SILVER" ? "text-slate-400" : "text-amber-700";
+  const connectedWallet = publicKey?.toBase58()?.toLowerCase();
+  const creatorWallet = campaign.org?.walletAddress?.toLowerCase();
+  const isSelfDonation = Boolean(connectedWallet && creatorWallet && connectedWallet === creatorWallet);
 
   const stateClasses: Record<string, string> = {
     ACTIVE: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
@@ -178,10 +183,15 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
               <h3 className="text-sm font-bold mb-4">Support this campaign</h3>
               <button
                 onClick={() => setDonateOpen(true)}
-                disabled={campaign.state !== "ACTIVE"}
+                disabled={campaign.state !== "ACTIVE" || isSelfDonation}
                 className="w-full py-3.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-bold flex items-center justify-center gap-2 shadow-lg shadow-violet-500/20 hover:shadow-violet-500/35 hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
               >
-                <Heart size={15} /> {campaign.state === "ACTIVE" ? "Donate SOL" : "Campaign Closed"}
+                <Heart size={15} />
+                {campaign.state !== "ACTIVE"
+                  ? "Campaign Closed"
+                  : isSelfDonation
+                    ? "Own Campaign"
+                    : "Donate SOL"}
               </button>
               <p className="text-[11px] text-white/25 text-center mt-3 leading-relaxed">
                 Funds go into an on-chain escrow vault. Released only after donor voting approves each milestone.

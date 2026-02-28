@@ -10,8 +10,8 @@ const RPC =
   process.env.NEXT_PUBLIC_SOLANA_RPC ?? "https://api.devnet.solana.com";
 
 const PRIVY_APP_ID = process.env.NEXT_PUBLIC_PRIVY_APP_ID ?? "";
-
 const solanaConnectors = toSolanaWalletConnectors({ shouldAutoConnect: true });
+const API_TOKEN_STORAGE_KEY = "credence:privy-access-token";
 
 // ─── Backend auth sync ────────────────────────────────────────────────────────
 function ApiTokenSync({ children }: { children: ReactNode }) {
@@ -19,7 +19,7 @@ function ApiTokenSync({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!ready || !authenticated) {
-      if (!authenticated) localStorage.removeItem("privy:token");
+      if (!authenticated) localStorage.removeItem(API_TOKEN_STORAGE_KEY);
       return;
     }
 
@@ -28,7 +28,7 @@ function ApiTokenSync({ children }: { children: ReactNode }) {
       try {
         const token = await getAccessToken();
         if (!token || cancelled) return;
-        localStorage.setItem("privy:token", token);
+        localStorage.setItem(API_TOKEN_STORAGE_KEY, token);
         await loginWithPrivy(token);
       } catch (err) {
         // Non-fatal — user is still logged in with Privy even if backend sync fails
@@ -66,7 +66,7 @@ export function Providers({ children }: { children: ReactNode }) {
     <PrivyProvider
       appId={PRIVY_APP_ID}
       config={{
-        loginMethods: ["google", "twitter", "wallet"],
+        loginMethods: ["twitter", "wallet", "google"],
         appearance: {
           theme: "dark",
           accentColor: "#7c3aed",
@@ -75,7 +75,7 @@ export function Providers({ children }: { children: ReactNode }) {
           loginMessage: "Transparent crowdfunding on Solana.",
         },
         embeddedWallets: {
-          solana: { createOnLogin: "off" },
+          solana: { createOnLogin: "users-without-wallets" },
         },
         externalWallets: {
           solana: { connectors: solanaConnectors },

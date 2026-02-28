@@ -18,6 +18,10 @@ const razorpay = new Razorpay({
 const SOL_INR_RATE = Number(process.env.SOL_INR_RATE ?? 4000);
 const LAMPORTS_PER_SOL = 1_000_000_000;
 
+function normalizeWallet(value?: string | null): string | null {
+    return value ? value.toLowerCase() : null;
+}
+
 /**
  * POST /api/donations/upi-intent
  * Create a Razorpay order for a UPI donation.
@@ -31,9 +35,22 @@ donationsRouter.post("/upi-intent", requireAuth, async (req: AuthedRequest, res)
             return;
         }
 
-        const campaign = await prisma.campaign.findUnique({ where: { id: campaignId } });
+        const campaign = await prisma.campaign.findUnique({
+            where: { id: campaignId },
+            include: { org: { include: { user: true } } },
+        });
         if (!campaign) { res.status(404).json({ error: "Campaign not found" }); return; }
         if (campaign.state !== "ACTIVE") { res.status(400).json({ error: "Campaign is not active" }); return; }
+
+        const requesterWallet = normalizeWallet(req.user?.walletAddress);
+        const creatorWallet = normalizeWallet(campaign.org.user.walletAddress);
+        if (
+            campaign.org.user.privyId === req.user!.privyId ||
+            (requesterWallet && creatorWallet && requesterWallet === creatorWallet)
+        ) {
+            res.status(403).json({ error: "You cannot donate to your own campaign" });
+            return;
+        }
 
         // Create Razorpay order (amount is in paise)
         const order = await razorpay.orders.create({
@@ -153,14 +170,27 @@ donationsRouter.post("/sol", requireAuth, async (req: AuthedRequest, res) => {
             return;
         }
 
-        const campaign = await prisma.campaign.findUnique({ where: { id: campaignId } });
+        const campaign = await prisma.campaign.findUnique({
+            where: { id: campaignId },
+            include: { org: { include: { user: true } } },
+        });
         if (!campaign) { res.status(404).json({ error: "Campaign not found" }); return; }
+        if (campaign.state !== "ACTIVE") { res.status(400).json({ error: "Campaign is not active" }); return; }
 
         // Prevent duplicate recording
         const existing = await prisma.donation.findUnique({ where: { txSignature } });
         if (existing) { res.json({ donation: { ...existing, amountLamports: existing.amountLamports.toString() } }); return; }
 
         const user = await prisma.user.findUnique({ where: { privyId: req.user!.privyId } });
+        const requesterWallet = normalizeWallet(donorWallet ?? user?.walletAddress ?? req.user?.walletAddress);
+        const creatorWallet = normalizeWallet(campaign.org.user.walletAddress);
+        if (
+            campaign.org.user.privyId === req.user!.privyId ||
+            (requesterWallet && creatorWallet && requesterWallet === creatorWallet)
+        ) {
+            res.status(403).json({ error: "You cannot donate to your own campaign" });
+            return;
+        }
 
         const [donation] = await prisma.$transaction([
             prisma.donation.create({

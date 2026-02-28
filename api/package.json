@@ -28,6 +28,7 @@
     "@prisma/adapter-libsql": "^7.4.2",
     "@prisma/adapter-pg": "^7.4.2",
     "@prisma/client": "^7.4.2",
+    "@privy-io/server-auth": "^1.32.5",
     "@solana/web3.js": "^1.98.0",
     "@types/express": "^5.0.6",
     "bs58": "^6.0.0",

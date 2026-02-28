@@ -1,5 +1,9 @@
 import express from "express";
 import cors from "cors";
+
+// Prisma returns BigInt for lamport fields — make them JSON-serializable globally
+(BigInt.prototype as any).toJSON = function () { return this.toString(); };
+
 import { authRouter } from "./routes/auth.js";
 import { orgsRouter } from "./routes/orgs.js";
 import { campaignsRouter } from "./routes/campaigns.js";

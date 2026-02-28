@@ -47,7 +47,6 @@ export default function CreatePage() {
     const [orgName, setOrgName] = useState("");
     const [orgCategory, setOrgCategory] = useState("STUDENT_ORG");
     const [orgDescription, setOrgDescription] = useState("");
-    const [orgTwitter, setOrgTwitter] = useState("");
     const [orgGstin, setOrgGstin] = useState("");
     const [gstinChecking, setGstinChecking] = useState(false);
 
@@ -119,7 +118,7 @@ export default function CreatePage() {
             try {
                 orgMeta = await createOrgMeta({
                     name: orgName, category: orgCategory, description: orgDescription,
-                    twitterHandle: orgTwitter, gstin: normalizedGstin, onchainPda: orgPdaAddress,
+                    gstin: normalizedGstin, onchainPda: orgPdaAddress,
                 });
             } catch (e: any) {
                 if (e?.response?.status !== 409) throw e;
@@ -193,10 +192,10 @@ export default function CreatePage() {
                     {STEPS.map((s, i) => (
                         <div key={s} className="flex-1 flex flex-col items-center gap-2">
                             <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${i < step
-                                    ? "bg-emerald-500 text-white"
-                                    : i === step
-                                        ? "bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-lg shadow-violet-500/20"
-                                        : "bg-[#161625] border border-white/[0.08] text-white/30"
+                                ? "bg-emerald-500 text-white"
+                                : i === step
+                                    ? "bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-lg shadow-violet-500/20"
+                                    : "bg-[#161625] border border-white/[0.08] text-white/30"
                                 }`}>
                                 {i < step ? "✓" : i + 1}
                             </div>
@@ -221,11 +220,14 @@ export default function CreatePage() {
                                     {Object.entries(ORG_CATEGORY_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                                 </select>
                             </Field>
-                            <Field label="Twitter Handle">
-                                <input className={inputCls} placeholder="@shaastra_iitm" value={orgTwitter} onChange={(e) => setOrgTwitter(e.target.value)} />
-                            </Field>
-                            <Field label="Organisation GSTIN *" hint="Required for on-chain GST hash binding and org verification">
-                                <input className={inputCls + " font-mono"} placeholder="e.g. 27AABCE1234F1Z5" value={orgGstin} onChange={(e) => setOrgGstin(e.target.value)} />
+                            <Field label="Organisation GSTIN *" hint="15-char format: 29AABCR1234A1Z5. Any valid format works in demo mode.">
+                                <div className="flex gap-2">
+                                    <input className={inputCls + " font-mono flex-1"} placeholder="e.g. 29AABCR1234A1Z5" value={orgGstin} onChange={(e) => setOrgGstin(e.target.value)} />
+                                    <button type="button" onClick={() => setOrgGstin("29AABCR1234A1Z5")}
+                                        className="px-3 py-2 rounded-xl bg-violet-500/10 border border-violet-500/20 text-violet-400 text-xs font-bold hover:bg-violet-500/20 transition-all whitespace-nowrap shrink-0">
+                                        Use Demo
+                                    </button>
+                                </div>
                             </Field>
                             <Field label="Description">
                                 <textarea className={inputCls + " min-h-[80px] resize-y"} placeholder="What does your organisation do?" value={orgDescription} onChange={(e) => setOrgDescription(e.target.value)} />

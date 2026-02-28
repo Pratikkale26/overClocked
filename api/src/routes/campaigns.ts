@@ -6,6 +6,15 @@ import { getPresignedUploadUrl } from "../services/s3.js";
 
 export const campaignsRouter = Router();
 
+async function isCampaignOwner(campaignId: string, privyId: string): Promise<boolean> {
+    const campaign = await prisma.campaign.findUnique({
+        where: { id: campaignId },
+        include: { org: { include: { user: true } } },
+    });
+    if (!campaign) return false;
+    return campaign.org.user.privyId === privyId;
+}
+
 /**
  * POST /api/campaigns
  * Save off-chain campaign metadata after on-chain create_project confirmed.
@@ -194,6 +203,12 @@ campaignsRouter.get("/:id", async (req, res) => {
  */
 campaignsRouter.post("/:id/upload-banner", requireAuth, async (req: AuthedRequest, res) => {
     try {
+        const isOwner = await isCampaignOwner(req.params.id as string, req.user!.privyId);
+        if (!isOwner) {
+            res.status(403).json({ error: "Only the campaign owner can upload banner images" });
+            return;
+        }
+
         const { fileName, contentType } = req.body;
         const key = `campaigns/${req.params.id}/banner/${fileName}`;
         const { uploadUrl, publicUrl } = await getPresignedUploadUrl(key, contentType);
@@ -217,6 +232,12 @@ campaignsRouter.post("/:id/upload-banner", requireAuth, async (req: AuthedReques
  */
 campaignsRouter.post("/:id/milestones/:index/upload-proof", requireAuth, async (req: AuthedRequest, res) => {
     try {
+        const isOwner = await isCampaignOwner(req.params.id as string, req.user!.privyId);
+        if (!isOwner) {
+            res.status(403).json({ error: "Only the campaign owner can upload milestone proof" });
+            return;
+        }
+
         const { fileName, contentType, votingWindowSecs } = req.body;
         const index = parseInt(req.params.index as string);
 
@@ -246,6 +267,12 @@ campaignsRouter.post("/:id/milestones/:index/upload-proof", requireAuth, async (
  */
 campaignsRouter.patch("/:id/onchain", requireAuth, async (req: AuthedRequest, res) => {
     try {
+        const isOwner = await isCampaignOwner(req.params.id as string, req.user!.privyId);
+        if (!isOwner) {
+            res.status(403).json({ error: "Only the campaign owner can update on-chain references" });
+            return;
+        }
+
         const { onchainProjectPda, onchainVaultPda, projectIdBytes, onchainOrgPda } = req.body;
         const campaign = await prisma.campaign.update({
             where: { id: req.params.id as string },

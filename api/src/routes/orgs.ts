@@ -59,6 +59,7 @@ orgsRouter.post("/", requireAuth, async (req: AuthedRequest, res) => {
         if (!user) { res.status(404).json({ error: "User not found" }); return; }
 
         const { name, description, category, websiteUrl, twitterHandle, onchainPda, gstin: gstinInput } = req.body;
+        const preferredTwitterHandle = user.twitterHandle ?? twitterHandle ?? undefined;
         if (!gstinInput) {
             res.status(400).json({ error: "gstin is required" });
             return;
@@ -81,7 +82,7 @@ orgsRouter.post("/", requireAuth, async (req: AuthedRequest, res) => {
                 description,
                 category: category ?? "OTHER",
                 websiteUrl,
-                twitterHandle,
+                twitterHandle: preferredTwitterHandle,
                 onchainPda,
                 onchainGstinHash: gstinHashHex,
                 gstin,
@@ -189,13 +190,19 @@ orgsRouter.post("/:id/upload-doc", requireAuth, async (req: AuthedRequest, res) 
     try {
         const { fileName, contentType } = req.body;
         if (!fileName || !contentType) { res.status(400).json({ error: "fileName and contentType required" }); return; }
+        const orgId = req.params.id as string;
+        const requester = await prisma.user.findUnique({ where: { privyId: req.user!.privyId }, include: { org: true } });
+        if (!requester?.org || requester.org.id !== orgId) {
+            res.status(403).json({ error: "Only the org owner can upload verification documents" });
+            return;
+        }
 
-        const key = `orgs/${req.params.id}/docs/${Date.now()}-${fileName}`;
+        const key = `orgs/${orgId}/docs/${Date.now()}-${fileName}`;
         const { uploadUrl, publicUrl } = await getPresignedUploadUrl(key, contentType);
 
         // Save the doc URL to the org
         await prisma.org.update({
-            where: { id: req.params.id as string},
+            where: { id: orgId},
             data: { docUrls: { push: publicUrl } },
         });
 
@@ -213,11 +220,18 @@ orgsRouter.post("/:id/upload-doc", requireAuth, async (req: AuthedRequest, res) 
 orgsRouter.patch("/:id/logo", requireAuth, async (req: AuthedRequest, res) => {
     try {
         const { fileName, contentType } = req.body;
-        const key = `orgs/${req.params.id}/logo/${fileName}`;
+        const orgId = req.params.id as string;
+        const requester = await prisma.user.findUnique({ where: { privyId: req.user!.privyId }, include: { org: true } });
+        if (!requester?.org || requester.org.id !== orgId) {
+            res.status(403).json({ error: "Only the org owner can update the org logo" });
+            return;
+        }
+
+        const key = `orgs/${orgId}/logo/${fileName}`;
         const { uploadUrl, publicUrl } = await getPresignedUploadUrl(key, contentType);
 
         await prisma.org.update({
-            where: { id: req.params.id as string },
+            where: { id: orgId },
             data: { logoUrl: publicUrl },
         });
 

@@ -29,6 +29,7 @@ export default function CreatePage() {
     const [orgCategory, setOrgCategory] = useState("STUDENT_ORG");
     const [orgDescription, setOrgDescription] = useState("");
     const [orgTwitter, setOrgTwitter] = useState("");
+    const [orgGstin, setOrgGstin] = useState("");
 
     // Campaign fields
     const [title, setTitle] = useState("");
@@ -78,6 +79,7 @@ export default function CreatePage() {
                 category: orgCategory,
                 description: orgDescription,
                 twitterHandle: orgTwitter,
+                gstin: orgGstin ? orgGstin.toUpperCase().trim() : undefined,
             });
 
             // Create campaign meta
@@ -157,6 +159,11 @@ export default function CreatePage() {
                             <div>
                                 <label style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 6, display: "block" }}>Twitter Handle</label>
                                 <input className="input" placeholder="@shaastra_iitm" value={orgTwitter} onChange={(e) => setOrgTwitter(e.target.value)} />
+                            </div>
+                            <div>
+                                <label style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 6, display: "block" }}>Organisation GSTIN (Optional)</label>
+                                <input className="input" placeholder="e.g. 27AABCE1234F1Z5" value={orgGstin} onChange={(e) => setOrgGstin(e.target.value)} style={{ fontFamily: "monospace" }} />
+                                <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4 }}>Adds a verification badge to your profile</div>
                             </div>
                             <div>
                                 <label style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 6, display: "block" }}>Description</label>

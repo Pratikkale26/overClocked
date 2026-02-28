@@ -61,6 +61,61 @@ export async function loginWithPrivy(privyToken: string) {
     return data.user as User;
 }
 
+// ── Milestone / Proof / DPR helpers ───────────────────────────────────
+
+export async function fetchMilestoneProof(milestoneId: string) {
+    const { data } = await api.get(`/milestones/${milestoneId}/proof`);
+    return data.proof as MilestoneProof | null;
+}
+
+export async function fetchMilestoneUpdates(milestoneId: string) {
+    const { data } = await api.get(`/milestones/${milestoneId}/updates`);
+    return data.updates as MilestoneUpdate[];
+}
+
+export async function fetchMilestoneFull(milestoneId: string) {
+    const { data } = await api.get(`/milestones/${milestoneId}/full`);
+    return data.milestone;
+}
+
+export async function fetchProofChain(campaignId: string) {
+    const { data } = await api.get(`/milestones/campaign/${campaignId}/proof-chain`);
+    return data.chain as MilestoneChainItem[];
+}
+
+export async function presignProofUpload(milestoneId: string, fileName: string, contentType: string) {
+    const { data } = await api.post(`/milestones/${milestoneId}/proof/presign`, { fileName, contentType });
+    return data as { uploadUrl: string; s3Key: string; publicUrl: string };
+}
+
+export async function submitMilestoneProof(milestoneId: string, body: {
+    gstin?: string;
+    isUnregisteredVendor?: boolean;
+    invoiceS3Key: string;
+    invoiceNumber?: string;
+    invoiceAmount?: number;
+    onchainProofUri?: string;
+    votingWindowSecs?: number;
+}) {
+    const { data } = await api.post(`/milestones/${milestoneId}/proof`, body);
+    return data;
+}
+
+export async function postMilestoneUpdate(milestoneId: string, body: {
+    type?: string;
+    title: string;
+    description?: string;
+    mediaUrls?: string[];
+}) {
+    const { data } = await api.post(`/milestones/${milestoneId}/updates`, body);
+    return data.update as MilestoneUpdate;
+}
+
+export async function presignUpdateMedia(milestoneId: string, fileName: string, contentType: string) {
+    const { data } = await api.post(`/milestones/${milestoneId}/updates/presign`, { fileName, contentType });
+    return data as { uploadUrl: string; s3Key: string; publicUrl: string };
+}
+
 // ── Types (lightweight, from API responses) ───────────────────────────────
 
 export interface Milestone {
@@ -110,6 +165,9 @@ export interface Org {
     twitterHandle?: string;
     websiteUrl?: string;
     onchainPda?: string;
+    gstin?: string;
+    gstinVerified?: boolean;
+    gstinLegalName?: string;
     verified: boolean;
     campaignsCreated: number;
     campaignsCompleted: number;
@@ -117,6 +175,7 @@ export interface Org {
     totalRaisedLamports: string;
     completionRateBps: number;
     campaigns?: Campaign[];
+    walletAddress?: string; // Added this line
 }
 
 export interface User {
@@ -125,4 +184,58 @@ export interface User {
     walletAddress?: string;
     email?: string;
     org?: Org;
+}
+
+export interface MilestoneProof {
+    id: string;
+    milestoneId: string;
+    gstin?: string;
+    gstinVerified: boolean;
+    vendorLegalName?: string;
+    vendorState?: string;
+    invoiceNumber?: string;
+    invoiceAmount?: number;
+    invoiceS3Key?: string;
+    invoiceHash: string;
+    prevProofHash?: string;
+    isUnregisteredVendor: boolean;
+    createdAt: string;
+}
+
+export interface MilestoneUpdate {
+    id: string;
+    milestoneId: string;
+    type: "PROGRESS" | "EXPENSE" | "PHOTO" | "COMPLETION" | "ANNOUNCEMENT";
+    title: string;
+    description?: string;
+    mediaUrls: string[];
+    contentHash: string;
+    postedAt: string;
+}
+
+export interface MilestoneChainItem {
+    id: string;
+    index: number;
+    title: string;
+    state: string;
+    proof?: MilestoneProof;
+    updates: MilestoneUpdate[];
+}
+
+// Legacy types kept for compat
+export interface MilestoneVote {
+    id: string;
+    milestoneId: string;
+    voter: string;
+    vote: "APPROVE" | "REJECT";
+    createdAt: string;
+}
+
+export interface DprUpdate {
+    id: string;
+    campaignId: string;
+    oldDpr: number;
+    newDpr: number;
+    reason: string;
+    createdAt: string;
 }

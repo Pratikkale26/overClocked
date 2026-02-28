@@ -100,7 +100,9 @@ export default function AuditPage({ params }: { params: Promise<{ id: string }> 
                                             {phase.proof.invoiceNumber && (
                                                 <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 6 }}>
                                                     Invoice: {phase.proof.invoiceNumber}
-                                                    {phase.proof.invoiceAmount ? ` · ₹${phase.proof.invoiceAmount.toLocaleString()}` : ""}
+                                                    {phase.proof.invoiceAmountPaise
+                                                        ? ` · ₹${(Number(phase.proof.invoiceAmountPaise) / 100).toLocaleString("en-IN")}`
+                                                        : ""}
                                                 </div>
                                             )}
 
@@ -117,7 +119,7 @@ export default function AuditPage({ params }: { params: Promise<{ id: string }> 
                                                     </div>
                                                 )}
                                                 <div style={{ fontSize: 10, color: "var(--text-muted)" }}>
-                                                    Submitted: {new Date(phase.proof.createdAt).toLocaleString("en-IN")}
+                                                    Submitted: {new Date(phase.proof.submittedAt).toLocaleString("en-IN")}
                                                 </div>
                                             </div>
                                         </div>

@@ -1,4 +1,5 @@
 import express from "express";
+import cors from "cors";
 import { authRouter } from "./routes/auth.js";
 import { orgsRouter } from "./routes/orgs.js";
 import { campaignsRouter } from "./routes/campaigns.js";
@@ -7,9 +8,19 @@ import { webhookRouter } from "./routes/webhook.js";
 import { milestonesRouter } from "./routes/milestones.js";
 
 const app = express();
+const allowedOrigins = (process.env.CORS_ORIGINS ?? "http://localhost:3000")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
 
 // Razorpay signature verification needs the exact raw request body.
 app.use("/api/donations/upi-webhook", express.raw({ type: "application/json" }));
+app.use(
+    cors({
+        origin: true, // Dynamically allow the requesting origin
+        credentials: true,
+    })
+);
 app.use(express.json({ limit: "5mb" }));
 
 app.get("/health", (_req, res) => {

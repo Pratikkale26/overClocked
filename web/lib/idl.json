@@ -1,0 +1,1558 @@
+{
+  "address": "G5WtbViVihHkgX9FrxZYup7qRKLudyzzNpiE96xMVZ8a",
+  "metadata": {
+    "name": "contract",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Created with Anchor"
+  },
+  "instructions": [
+    {
+      "name": "claim_prefront_tranche",
+      "discriminator": [
+        240,
+        69,
+        232,
+        191,
+        251,
+        113,
+        224,
+        53
+      ],
+      "accounts": [
+        {
+          "name": "creator",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "project",
+          "writable": true
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "project"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "create_org",
+      "discriminator": [
+        48,
+        115,
+        187,
+        249,
+        36,
+        3,
+        186,
+        175
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "org",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  114,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "gstin_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "create_project",
+      "discriminator": [
+        148,
+        219,
+        181,
+        42,
+        221,
+        114,
+        145,
+        190
+      ],
+      "accounts": [
+        {
+          "name": "creator",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "org",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  114,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "creator"
+              }
+            ]
+          }
+        },
+        {
+          "name": "project",
+          "writable": true
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "project"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "params",
+          "type": {
+            "defined": {
+              "name": "CreateProjectParams"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "donate",
+      "discriminator": [
+        121,
+        186,
+        218,
+        211,
+        73,
+        70,
+        196,
+        180
+      ],
+      "accounts": [
+        {
+          "name": "donor",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "project",
+          "writable": true
+        },
+        {
+          "name": "donor_record",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  111,
+                  110,
+                  111,
+                  114,
+                  95,
+                  114,
+                  101,
+                  99,
+                  111,
+                  114,
+                  100
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "project"
+              },
+              {
+                "kind": "account",
+                "path": "donor"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "project"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount_lamports",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "early_withdraw",
+      "discriminator": [
+        19,
+        147,
+        103,
+        62,
+        98,
+        55,
+        65,
+        249
+      ],
+      "accounts": [
+        {
+          "name": "donor",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "project",
+          "writable": true
+        },
+        {
+          "name": "donor_record",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  111,
+                  110,
+                  111,
+                  114,
+                  95,
+                  114,
+                  101,
+                  99,
+                  111,
+                  114,
+                  100
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "project"
+              },
+              {
+                "kind": "account",
+                "path": "donor"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "project"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "finalize_milestone",
+      "discriminator": [
+        7,
+        134,
+        89,
+        13,
+        34,
+        31,
+        108,
+        149
+      ],
+      "accounts": [
+        {
+          "name": "caller",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "project",
+          "writable": true
+        },
+        {
+          "name": "org",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  114,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "project.creator",
+                "account": "Project"
+              }
+            ]
+          }
+        },
+        {
+          "name": "creator",
+          "writable": true
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "project"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "milestone_index",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "initialize_platform",
+      "discriminator": [
+        119,
+        201,
+        101,
+        45,
+        75,
+        122,
+        89,
+        3
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "platform_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  108,
+                  97,
+                  116,
+                  102,
+                  111,
+                  114,
+                  109,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "fee_bps",
+          "type": "u16"
+        },
+        {
+          "name": "treasury",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "platform_override",
+      "discriminator": [
+        29,
+        111,
+        202,
+        109,
+        214,
+        241,
+        20,
+        33
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "platform_config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  108,
+                  97,
+                  116,
+                  102,
+                  111,
+                  114,
+                  109,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "project",
+          "writable": true
+        },
+        {
+          "name": "creator",
+          "writable": true
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "project"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "action",
+          "type": {
+            "defined": {
+              "name": "OverrideAction"
+            }
+          }
+        },
+        {
+          "name": "milestone_index",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "submit_milestone_proof",
+      "discriminator": [
+        95,
+        246,
+        144,
+        35,
+        212,
+        197,
+        162,
+        197
+      ],
+      "accounts": [
+        {
+          "name": "creator",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "project",
+          "writable": true
+        },
+        {
+          "name": "org",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  114,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "project.creator",
+                "account": "Project"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "milestone_index",
+          "type": "u8"
+        },
+        {
+          "name": "proof_uri",
+          "type": "string"
+        },
+        {
+          "name": "invoice_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "vendor_gstin_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "voting_window_secs",
+          "type": "i64"
+        }
+      ]
+    },
+    {
+      "name": "vote_milestone",
+      "discriminator": [
+        43,
+        27,
+        71,
+        239,
+        231,
+        20,
+        102,
+        156
+      ],
+      "accounts": [
+        {
+          "name": "voter",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "project",
+          "writable": true
+        },
+        {
+          "name": "donor_record",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  111,
+                  110,
+                  111,
+                  114,
+                  95,
+                  114,
+                  101,
+                  99,
+                  111,
+                  114,
+                  100
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "project"
+              },
+              {
+                "kind": "account",
+                "path": "voter"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "milestone_index",
+          "type": "u8"
+        },
+        {
+          "name": "approve",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "withdraw_donation",
+      "discriminator": [
+        170,
+        152,
+        71,
+        10,
+        232,
+        105,
+        155,
+        39
+      ],
+      "accounts": [
+        {
+          "name": "donor",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "project",
+          "writable": true
+        },
+        {
+          "name": "donor_record",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  111,
+                  110,
+                  111,
+                  114,
+                  95,
+                  114,
+                  101,
+                  99,
+                  111,
+                  114,
+                  100
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "project"
+              },
+              {
+                "kind": "account",
+                "path": "donor"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "project"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    }
+  ],
+  "accounts": [
+    {
+      "name": "DonorRecord",
+      "discriminator": [
+        204,
+        101,
+        15,
+        37,
+        82,
+        141,
+        165,
+        40
+      ]
+    },
+    {
+      "name": "OrgAccount",
+      "discriminator": [
+        35,
+        98,
+        53,
+        119,
+        196,
+        72,
+        191,
+        3
+      ]
+    },
+    {
+      "name": "PlatformConfig",
+      "discriminator": [
+        160,
+        78,
+        128,
+        0,
+        248,
+        83,
+        230,
+        160
+      ]
+    },
+    {
+      "name": "Project",
+      "discriminator": [
+        205,
+        168,
+        189,
+        202,
+        181,
+        247,
+        142,
+        19
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "NotAdmin",
+      "msg": "Unauthorized: admin only"
+    },
+    {
+      "code": 6001,
+      "name": "NotCreator",
+      "msg": "Unauthorized: only the project creator"
+    },
+    {
+      "code": 6002,
+      "name": "OrgAlreadyExists",
+      "msg": "Org already exists for this authority"
+    },
+    {
+      "code": 6003,
+      "name": "InvalidGstinHash",
+      "msg": "Invalid GSTIN hash"
+    },
+    {
+      "code": 6004,
+      "name": "OrgGstinMismatch",
+      "msg": "Vendor GSTIN does not match org GSTIN"
+    },
+    {
+      "code": 6005,
+      "name": "ProjectNotActive",
+      "msg": "Project is not active"
+    },
+    {
+      "code": 6006,
+      "name": "ProjectFrozen",
+      "msg": "Project is frozen by platform admin"
+    },
+    {
+      "code": 6007,
+      "name": "CampaignDeadlinePassed",
+      "msg": "Campaign deadline has already passed"
+    },
+    {
+      "code": 6008,
+      "name": "InvalidMilestoneCount",
+      "msg": "Invalid milestone count: must be 1-10"
+    },
+    {
+      "code": 6009,
+      "name": "InvalidMilestoneAmounts",
+      "msg": "Milestone amounts must sum to total goal"
+    },
+    {
+      "code": 6010,
+      "name": "MilestoneIndexOutOfRange",
+      "msg": "Invalid milestone index"
+    },
+    {
+      "code": 6011,
+      "name": "InvalidAmount",
+      "msg": "Donation amount must be greater than zero"
+    },
+    {
+      "code": 6012,
+      "name": "MilestoneNotPending",
+      "msg": "Milestone is not in Pending state"
+    },
+    {
+      "code": 6013,
+      "name": "MilestoneNotUnderReview",
+      "msg": "Milestone is not under review"
+    },
+    {
+      "code": 6014,
+      "name": "InvalidProofUri",
+      "msg": "Proof URI exceeds 200 characters"
+    },
+    {
+      "code": 6015,
+      "name": "MaxResubmissionsReached",
+      "msg": "Max resubmissions (3) reached: project has failed"
+    },
+    {
+      "code": 6016,
+      "name": "VotingNotOpen",
+      "msg": "Voting window is not open for this milestone"
+    },
+    {
+      "code": 6017,
+      "name": "VotingWindowNotExpired",
+      "msg": "Voting window has not yet expired"
+    },
+    {
+      "code": 6018,
+      "name": "AlreadyVoted",
+      "msg": "Donor has already voted on this milestone"
+    },
+    {
+      "code": 6019,
+      "name": "NoDonorRecord",
+      "msg": "No donation record found for this donor on this project"
+    },
+    {
+      "code": 6020,
+      "name": "WithdrawalNotEligible",
+      "msg": "Withdrawal conditions not met"
+    },
+    {
+      "code": 6021,
+      "name": "AlreadyWithdrawn",
+      "msg": "Funds already withdrawn"
+    },
+    {
+      "code": 6022,
+      "name": "MilestoneDeadlineNotPassed",
+      "msg": "Milestone deadline has not passed yet"
+    },
+    {
+      "code": 6023,
+      "name": "InsufficientFundsForPrefront",
+      "msg": "Raised amount is insufficient to start prefront tranches"
+    },
+    {
+      "code": 6024,
+      "name": "PrefrontFullyClaimed",
+      "msg": "All prefront tranches have been claimed"
+    },
+    {
+      "code": 6025,
+      "name": "PrefrontIntervalNotElapsed",
+      "msg": "Prefront interval has not elapsed (one tranche per week)"
+    },
+    {
+      "code": 6026,
+      "name": "NoPrefrontConfigured",
+      "msg": "No prefront configured for this campaign"
+    },
+    {
+      "code": 6027,
+      "name": "ArithmeticOverflow",
+      "msg": "Arithmetic overflow"
+    }
+  ],
+  "types": [
+    {
+      "name": "CreateProjectParams",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "project_id",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "has_goal",
+            "type": "bool"
+          },
+          {
+            "name": "total_goal",
+            "docs": [
+              "Total campaign goal in lamports (0 for open campaign). INCLUDES prefront."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "use_milestone_pct",
+            "type": "bool"
+          },
+          {
+            "name": "deadline",
+            "type": "i64"
+          },
+          {
+            "name": "yield_policy",
+            "type": "u8"
+          },
+          {
+            "name": "yield_rate_bps",
+            "type": "u16"
+          },
+          {
+            "name": "prefront_lamports",
+            "docs": [
+              "Advance funds the creator needs before starting. Part of total_goal."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "prefront_tranches",
+            "docs": [
+              "How many equal weekly tranches to split the prefront into (0 = no prefront)"
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "milestones",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "MilestoneInput"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "DonorRecord",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "donor",
+            "type": "pubkey"
+          },
+          {
+            "name": "project",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount_lamports",
+            "type": "u64"
+          },
+          {
+            "name": "withdrawn",
+            "type": "bool"
+          },
+          {
+            "name": "is_early_exit",
+            "type": "bool"
+          },
+          {
+            "name": "voted_bitmap",
+            "docs": [
+              "Each bit i = has voted on milestone index i (up to 64 milestones)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MilestoneData",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "amount",
+            "docs": [
+              "Fixed lamport release. Use 0 if pct-based."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "release_pct_bps",
+            "docs": [
+              "Basis points of current escrow balance to release. Use 0 if fixed."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "deadline",
+            "type": "i64"
+          },
+          {
+            "name": "state",
+            "type": {
+              "defined": {
+                "name": "MilestoneState"
+              }
+            }
+          },
+          {
+            "name": "proof_uri",
+            "docs": [
+              "S3 / IPFS URI of proof metadata JSON. Max MAX_PROOF_URI_LEN chars."
+            ],
+            "type": "string"
+          },
+          {
+            "name": "invoice_hash",
+            "docs": [
+              "SHA-256 hash of the GST invoice PDF — forms the Proof-of-History chain.",
+              "[0u8; 32] means no proof submitted yet."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "vote_yes",
+            "docs": [
+              "Sum of lamport weights voting yes"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "vote_no",
+            "docs": [
+              "Sum of lamport weights voting no"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "total_eligible",
+            "docs": [
+              "Snapshot of project.raised when voting window opened"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "threshold_bps",
+            "docs": [
+              "Min yes/(yes+no) ratio in bps to approve (default 5100 = 51%)"
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "quorum_bps",
+            "docs": [
+              "Min (yes+no)/total_eligible ratio in bps for valid vote (default 1000 = 10%)"
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "voting_start",
+            "type": "i64"
+          },
+          {
+            "name": "voting_end",
+            "type": "i64"
+          },
+          {
+            "name": "revision_count",
+            "docs": [
+              "Times creator resubmitted proof after rejection"
+            ],
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MilestoneInput",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "amount",
+            "docs": [
+              "Fixed lamport amount to release (0 if pct-based)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "release_pct_bps",
+            "docs": [
+              "Basis points of escrow to release (0 if fixed amount)"
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "deadline",
+            "type": "i64"
+          },
+          {
+            "name": "threshold_bps",
+            "docs": [
+              "0 = use default DEFAULT_THRESHOLD_BPS (5100)"
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "quorum_bps",
+            "docs": [
+              "0 = use default DEFAULT_QUORUM_BPS (1000)"
+            ],
+            "type": "u16"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MilestoneState",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Pending"
+          },
+          {
+            "name": "UnderReview"
+          },
+          {
+            "name": "Approved"
+          },
+          {
+            "name": "Rejected"
+          }
+        ]
+      }
+    },
+    {
+      "name": "OrgAccount",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "gstin_hash",
+            "docs": [
+              "SHA-256 hash of the org's verified GSTIN (uppercase, trimmed)."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "campaigns_created",
+            "type": "u32"
+          },
+          {
+            "name": "campaigns_completed",
+            "type": "u32"
+          },
+          {
+            "name": "campaigns_failed",
+            "type": "u32"
+          },
+          {
+            "name": "total_raised_lamports",
+            "type": "u64"
+          },
+          {
+            "name": "total_released_lamports",
+            "type": "u64"
+          },
+          {
+            "name": "completion_rate_bps",
+            "type": "u16"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "OverrideAction",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Freeze"
+          },
+          {
+            "name": "Unfreeze"
+          },
+          {
+            "name": "ForceReleaseMilestone"
+          },
+          {
+            "name": "ForceRefundAll"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PlatformConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "fee_bps",
+            "type": "u16"
+          },
+          {
+            "name": "treasury",
+            "type": "pubkey"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Project",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "creator",
+            "type": "pubkey"
+          },
+          {
+            "name": "org",
+            "type": "pubkey"
+          },
+          {
+            "name": "project_id",
+            "docs": [
+              "32-byte unique project ID (UUID bytes). Used in PDA seeds."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "has_goal",
+            "type": "bool"
+          },
+          {
+            "name": "total_goal",
+            "docs": [
+              "Total campaign goal in lamports (0 = open campaign). Includes prefront."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "use_milestone_pct",
+            "docs": [
+              "If true, milestones release a % of current escrow instead of a fixed amount"
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "raised",
+            "docs": [
+              "Total lamports currently in escrow"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "milestone_count",
+            "type": "u8"
+          },
+          {
+            "name": "current_milestone",
+            "type": "u8"
+          },
+          {
+            "name": "state",
+            "type": {
+              "defined": {
+                "name": "ProjectState"
+              }
+            }
+          },
+          {
+            "name": "yield_policy",
+            "docs": [
+              "0=none, 1=flexible(5%), 2=30d(8%), 3=60d(12%) — mocked for hackathon"
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "yield_rate_bps",
+            "type": "u16"
+          },
+          {
+            "name": "yield_locked_until",
+            "type": "i64"
+          },
+          {
+            "name": "deadline",
+            "type": "i64"
+          },
+          {
+            "name": "prefront_lamports",
+            "docs": [
+              "Total advance funds the creator needs before work can begin.",
+              "This is part of total_goal (Option A). 0 = no prefront."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "prefront_tranches",
+            "docs": [
+              "Number of equal weekly tranches (e.g. 4 = 25% per week for 4 weeks)"
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "prefront_claimed",
+            "docs": [
+              "Number of tranches claimed so far"
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "prefront_start",
+            "docs": [
+              "Unix timestamp of first donation (prefront clock starts here)"
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "vault_bump",
+            "type": "u8"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "milestones",
+            "docs": [
+              "Inline milestone data (up to MAX_MILESTONES = 10)"
+            ],
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "MilestoneData"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "ProjectState",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Active"
+          },
+          {
+            "name": "Completed"
+          },
+          {
+            "name": "Failed"
+          },
+          {
+            "name": "Frozen"
+          }
+        ]
+      }
+    }
+  ]
+}

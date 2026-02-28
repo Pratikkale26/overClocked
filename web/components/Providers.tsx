@@ -4,109 +4,85 @@ import { useEffect, useMemo, type ReactNode } from "react";
 import { PrivyProvider, usePrivy } from "@privy-io/react-auth";
 import { toSolanaWalletConnectors } from "@privy-io/react-auth/solana";
 import { ConnectionProvider, WalletProvider } from "@solana/wallet-adapter-react";
-import {
-  PhantomWalletAdapter,
-  SolflareWalletAdapter,
-  UnsafeBurnerWalletAdapter,
-} from "@solana/wallet-adapter-wallets";
-import { createSolanaRpc, createSolanaRpcSubscriptions } from "@solana/kit";
 import { loginWithPrivy } from "../lib/api";
 
-const DEVNET_RPC_URL =
+const RPC =
   process.env.NEXT_PUBLIC_SOLANA_RPC ?? "https://api.devnet.solana.com";
 
-const DEVNET_WSS_URL = DEVNET_RPC_URL.startsWith("https://")
-  ? DEVNET_RPC_URL.replace("https://", "wss://")
-  : DEVNET_RPC_URL.startsWith("http://")
-    ? DEVNET_RPC_URL.replace("http://", "ws://")
-    : "wss://api.devnet.solana.com";
+const PRIVY_APP_ID = process.env.NEXT_PUBLIC_PRIVY_APP_ID ?? "";
 
 const solanaConnectors = toSolanaWalletConnectors({ shouldAutoConnect: true });
 
+// ─── Backend auth sync ────────────────────────────────────────────────────────
 function ApiTokenSync({ children }: { children: ReactNode }) {
   const { authenticated, ready, getAccessToken } = usePrivy();
 
   useEffect(() => {
-    if (!ready) return;
-
-    if (!authenticated) {
-      localStorage.removeItem("privy:token");
+    if (!ready || !authenticated) {
+      if (!authenticated) localStorage.removeItem("privy:token");
       return;
     }
 
     let cancelled = false;
-
     (async () => {
       try {
         const token = await getAccessToken();
         if (!token || cancelled) return;
-
         localStorage.setItem("privy:token", token);
         await loginWithPrivy(token);
-      } catch {
-        // Non-blocking: the app can still run while backend auth catches up.
+      } catch (err) {
+        // Non-fatal — user is still logged in with Privy even if backend sync fails
+        console.warn("[Credence] Backend auth sync failed (non-critical):", err);
       }
     })();
-
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [authenticated, getAccessToken, ready]);
 
   return <>{children}</>;
 }
 
-export function Providers({ children }: { children: ReactNode }) {
-  const wallets = useMemo(
-    () => [new PhantomWalletAdapter(), new SolflareWalletAdapter(), new UnsafeBurnerWalletAdapter()],
-    []
-  );
-
+// ─── Wallet providers (must be inside PrivyProvider) ─────────────────────────
+function WalletProviders({ children }: { children: ReactNode }) {
+  // Empty wallets array — Privy's connectors provide wallets via toSolanaWalletConnectors
+  const wallets = useMemo(() => [], []);
   return (
-    <ConnectionProvider endpoint={DEVNET_RPC_URL}>
+    <ConnectionProvider endpoint={RPC}>
       <WalletProvider wallets={wallets} autoConnect>
-        <PrivyProvider
-          appId={process.env.NEXT_PUBLIC_PRIVY_APP_ID ?? ""}
-          config={{
-            loginMethods: ["twitter", "google", "wallet"],
-            appearance: {
-              theme: "dark",
-              accentColor: "#FF6B35",
-              walletChainType: "solana-only",
-              landingHeader: "Welcome to DareMe",
-              loginMessage: "Put your money where your mouth is.",
-            },
-            embeddedWallets: {
-              solana: {
-                createOnLogin: "users-without-wallets",
-              },
-            },
-            externalWallets: {
-              solana: {
-                connectors: solanaConnectors,
-              },
-            },
-            solana: {
-              rpcs: {
-                "solana:devnet": {
-                  rpc: createSolanaRpc(DEVNET_RPC_URL),
-                  rpcSubscriptions: createSolanaRpcSubscriptions(DEVNET_WSS_URL),
-                  blockExplorerUrl: "https://solscan.io/?cluster=devnet",
-                },
-                "solana:mainnet": {
-                  rpc: createSolanaRpc("https://api.mainnet-beta.solana.com"),
-                  rpcSubscriptions: createSolanaRpcSubscriptions(
-                    "wss://api.mainnet-beta.solana.com"
-                  ),
-                  blockExplorerUrl: "https://solscan.io",
-                },
-              },
-            },
-          }}
-        >
-          <ApiTokenSync>{children}</ApiTokenSync>
-        </PrivyProvider>
+        <ApiTokenSync>{children}</ApiTokenSync>
       </WalletProvider>
     </ConnectionProvider>
+  );
+}
+
+// ─── Root provider ────────────────────────────────────────────────────────────
+export function Providers({ children }: { children: ReactNode }) {
+  useEffect(() => {
+    if (!PRIVY_APP_ID) {
+      console.error("[Credence] NEXT_PUBLIC_PRIVY_APP_ID is not set!");
+    }
+  }, []);
+
+  return (
+    <PrivyProvider
+      appId={PRIVY_APP_ID}
+      config={{
+        loginMethods: ["google", "twitter", "wallet"],
+        appearance: {
+          theme: "dark",
+          accentColor: "#7c3aed",
+          walletChainType: "solana-only",
+          landingHeader: "Welcome to Credence",
+          loginMessage: "Transparent crowdfunding on Solana.",
+        },
+        embeddedWallets: {
+          solana: { createOnLogin: "off" },
+        },
+        externalWallets: {
+          solana: { connectors: solanaConnectors },
+        },
+      }}
+    >
+      <WalletProviders>{children}</WalletProviders>
+    </PrivyProvider>
   );
 }

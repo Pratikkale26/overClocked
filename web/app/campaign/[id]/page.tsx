@@ -136,8 +136,7 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
               <VotingPanel
                 milestone={activeMilestone}
                 proof={activeProof}
-                campaignId={campaign.id}
-                raisedLamports={campaign.raisedLamports}
+                campaign={campaign}
                 onVoted={load}
               />
             )}
@@ -151,7 +150,7 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
                 </span>
               </h2>
               <DprTimeline updates={activeUpdates} />
-              <Link href={`/campaigns/${campaign.id}/audit`} style={{ display: "block", marginTop: 16, textAlign: "center" }}>
+              <Link href={`/campaign/${campaign.id}/audit`} style={{ display: "block", marginTop: 16, textAlign: "center" }}>
                 <button className="btn btn-ghost btn-sm" style={{ width: "100%" }}>
                   <ExternalLink size={13} /> View Full Audit Chain
                 </button>
@@ -254,8 +253,8 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
                   </a>
                 )}
 
-                {campaign.org?.id && (
-                  <Link href={`/org/${campaign.org.id}`}>
+                {(campaign.org?.walletAddress || campaign.org?.id) && (
+                  <Link href={`/org/${campaign.org.walletAddress ?? campaign.org.id}`}>
                     <button className="btn btn-ghost btn-sm" style={{ width: "100%", marginTop: 12 }}>
                       <TrendingUp size={13} /> View Full Profile
                     </button>
@@ -284,7 +283,7 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
         </div>
       </main>
 
-      <DonateModal campaignId={campaign.id} open={donateOpen} onClose={() => setDonateOpen(false)} />
+      <DonateModal campaign={campaign} open={donateOpen} onClose={() => setDonateOpen(false)} onSuccess={load} />
     </div>
   );
 }

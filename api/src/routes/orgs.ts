@@ -116,8 +116,9 @@ orgsRouter.post("/", requireAuth, async (req: AuthedRequest, res) => {
  */
 orgsRouter.get("/:walletAddress", async (req, res) => {
     try {
-        const user = await prisma.user.findUnique({
-            where: { walletAddress: req.params.walletAddress },
+        const key = req.params.walletAddress;
+        let user = await prisma.user.findUnique({
+            where: { walletAddress: key },
             include: {
                 org: {
                     include: {
@@ -137,8 +138,43 @@ orgsRouter.get("/:walletAddress", async (req, res) => {
             },
         });
 
-        if (!user?.org) { res.status(404).json({ error: "Org not found" }); return; }
-        res.json({ org: user.org });
+        // Backward-compatible fallback: allow org id in this route.
+        if (!user?.org) {
+            const orgById = await prisma.org.findUnique({
+                where: { id: key },
+                include: {
+                    user: true,
+                    campaigns: {
+                        select: {
+                            id: true,
+                            title: true,
+                            state: true,
+                            raisedLamports: true,
+                            totalGoalLamports: true,
+                            createdAt: true,
+                        },
+                        orderBy: { createdAt: "desc" },
+                    },
+                },
+            });
+            if (!orgById) {
+                res.status(404).json({ error: "Org not found" });
+                return;
+            }
+            res.json({
+                org: {
+                    ...orgById,
+                    walletAddress: orgById.user?.walletAddress ?? null,
+                },
+            });
+            return;
+        }
+        res.json({
+            org: {
+                ...user.org,
+                walletAddress: user.walletAddress ?? null,
+            },
+        });
     } catch (err) {
         console.error("[orgs/get]", err);
         res.status(500).json({ error: "Internal server error" });

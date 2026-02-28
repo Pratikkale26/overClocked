@@ -81,7 +81,7 @@ export default function ManageCampaignPage({ params }: { params: Promise<{ id: s
                 isUnregisteredVendor: isUnregistered,
                 invoiceS3Key: s3Key,
                 invoiceNumber: invoiceNumber || undefined,
-                invoiceAmount: invoiceAmount ? parseFloat(invoiceAmount) : undefined,
+                invoiceAmountPaise: invoiceAmount ? Math.round(parseFloat(invoiceAmount) * 100) : undefined,
                 votingWindowSecs: votingHours * 3600,
             });
 

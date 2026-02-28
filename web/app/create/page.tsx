@@ -3,11 +3,24 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { usePrivy } from "@privy-io/react-auth";
+import { useConnection, useWallet } from "@solana/wallet-adapter-react";
+import { PublicKey } from "@solana/web3.js";
+import { AnchorProvider } from "@coral-xyz/anchor";
 import { toast } from "sonner";
 import { Plus, Trash2, ArrowRight, ArrowLeft, Info } from "lucide-react";
 import { Navbar } from "../../components/layout/Navbar";
-import { createCampaignMeta, createOrgMeta } from "../../lib/api";
-import { YIELD_LABELS, ORG_CATEGORY_LABELS } from "../../lib/utils";
+import { createCampaignMeta, createOrgMeta, verifyOrgGstin, patchCampaignOnchain } from "../../lib/api";
+import { YIELD_LABELS, ORG_CATEGORY_LABELS, LAMPORTS_PER_SOL } from "../../lib/utils";
+import {
+    getProgram,
+    buildCreateOrgTx,
+    buildCreateProjectTx,
+    generateProjectId,
+    projectIdToHex,
+    yieldPolicyToRateBps,
+    deriveOrgPDA,
+    fetchOrgAccount,
+} from "../../lib/anchor";
 
 const STEPS = ["Org Check", "Campaign Info", "Milestones", "Review & Launch"];
 
@@ -19,7 +32,9 @@ interface MilestoneForm {
 
 export default function CreatePage() {
     const router = useRouter();
-    const { authenticated, login, getAccessToken } = usePrivy();
+    const { authenticated, login } = usePrivy();
+    const { connection } = useConnection();
+    const { publicKey, sendTransaction } = useWallet();
 
     const [step, setStep] = useState(0);
     const [loading, setLoading] = useState(false);
@@ -30,6 +45,7 @@ export default function CreatePage() {
     const [orgDescription, setOrgDescription] = useState("");
     const [orgTwitter, setOrgTwitter] = useState("");
     const [orgGstin, setOrgGstin] = useState("");
+    const [gstinChecking, setGstinChecking] = useState(false);
 
     // Campaign fields
     const [title, setTitle] = useState("");
@@ -70,42 +86,121 @@ export default function CreatePage() {
     const handleSubmit = async () => {
         setLoading(true);
         try {
-            const token = await getAccessToken();
-            const LAMPORTS = 1_000_000_000;
+            const walletAddress = publicKey?.toBase58();
+            if (!walletAddress) {
+                toast.error("Connect your wallet first");
+                return;
+            }
 
-            // Create org meta first
-            await createOrgMeta({
-                name: orgName,
-                category: orgCategory,
-                description: orgDescription,
-                twitterHandle: orgTwitter,
-                gstin: orgGstin ? orgGstin.toUpperCase().trim() : undefined,
-            });
+            const normalizedGstin = orgGstin.toUpperCase().trim();
 
-            // Create campaign meta
+            // Step 1: Verify GSTIN and fetch hash bytes
+            setGstinChecking(true);
+            const gst = await verifyOrgGstin(normalizedGstin);
+            setGstinChecking(false);
+
+            const creatorPubkey = new PublicKey(walletAddress);
+            const provider = new AnchorProvider(connection, {} as any, { commitment: "confirmed" });
+            const program = getProgram(provider);
+
+            // Step 2: Check if org PDA already exists on-chain
+            const existingOrg = await fetchOrgAccount(program, creatorPubkey);
+
+            let orgPdaAddress: string;
+            const [orgPDA] = deriveOrgPDA(creatorPubkey);
+            orgPdaAddress = orgPDA.toBase58();
+
+            if (!existingOrg) {
+                // Step 3a: Create org on-chain
+                toast.info("Creating org on-chain...", { description: "Please approve the transaction in your wallet." });
+                const createOrgTx = await buildCreateOrgTx(program, creatorPubkey, gst.gstinHashBytes);
+                await sendTransaction(createOrgTx, connection);
+                toast.success("Org created on-chain! ✅");
+            } else {
+                toast.info("Org already exists on-chain, skipping...");
+            }
+
+            // Step 4: Save org metadata to backend
+            let orgMeta;
+            try {
+                orgMeta = await createOrgMeta({
+                    name: orgName,
+                    category: orgCategory,
+                    description: orgDescription,
+                    twitterHandle: orgTwitter,
+                    gstin: normalizedGstin,
+                    onchainPda: orgPdaAddress,
+                });
+            } catch (e: any) {
+                // If org already exists in DB (409), that's fine
+                if (e?.response?.status !== 409) throw e;
+                toast.info("Org already registered in backend");
+            }
+
+            // Step 5: Save campaign metadata to backend
             const campaign = await createCampaignMeta({
                 title,
                 description,
                 category: orgCategory,
                 tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
                 hasGoal: true,
-                totalGoalLamports: Math.floor(goalSolNum * LAMPORTS),
+                totalGoalLamports: Math.floor(goalSolNum * LAMPORTS_PER_SOL),
                 yieldPolicy,
                 milestones: milestones.map((m) => ({
                     title: m.title,
                     description: m.description,
-                    amountLamports: Math.floor(parseFloat(m.amountSol || "0") * LAMPORTS),
+                    amountLamports: Math.floor(parseFloat(m.amountSol || "0") * LAMPORTS_PER_SOL),
                 })),
             });
 
-            toast.success("Campaign created!", {
-                description: "Now call create_project on-chain to activate the escrow vault.",
+            // Step 6: Create project on-chain
+            const projectId = generateProjectId();
+            const deadlineUnix = Math.floor(Date.now() / 1000) + 90 * 24 * 3600; // 90 days from now
+
+            toast.info("Creating project on-chain...", { description: "Please approve the transaction in your wallet." });
+
+            const { tx: createProjectTx, projectPDA, vaultPDA } = await buildCreateProjectTx(
+                program,
+                creatorPubkey,
+                {
+                    projectId: Array.from(projectId),
+                    hasGoal: true,
+                    totalGoalLamports: Math.floor(goalSolNum * LAMPORTS_PER_SOL),
+                    useMilestonePct: false,
+                    deadlineUnix,
+                    yieldPolicy,
+                    prefrontLamports: 0,
+                    prefrontTranches: 0,
+                    milestones: milestones.map((m) => ({
+                        amount: Math.floor(parseFloat(m.amountSol || "0") * LAMPORTS_PER_SOL),
+                        releasePctBps: 0,
+                        deadline: deadlineUnix,
+                        thresholdBps: 5100,
+                        quorumBps: 1000,
+                    })),
+                }
+            );
+
+            await sendTransaction(createProjectTx, connection);
+
+            // Step 7: Save PDA addresses back to backend
+            await patchCampaignOnchain(campaign.id, {
+                onchainProjectPda: projectPDA.toBase58(),
+                onchainVaultPda: vaultPDA.toBase58(),
+                projectIdBytes: projectIdToHex(projectId),
+                onchainOrgPda: orgPdaAddress,
             });
+
+            toast.success("Campaign launched on-chain! 🚀", {
+                description: "Your campaign is live with an on-chain escrow vault.",
+            });
+
             router.push(`/campaign/${campaign.id}`);
         } catch (e: unknown) {
             const message = e instanceof Error ? e.message : "Unknown error";
             toast.error("Failed to create campaign", { description: message });
         } finally {
+            setGstinChecking(false);
             setLoading(false);
         }
     };
@@ -161,9 +256,9 @@ export default function CreatePage() {
                                 <input className="input" placeholder="@shaastra_iitm" value={orgTwitter} onChange={(e) => setOrgTwitter(e.target.value)} />
                             </div>
                             <div>
-                                <label style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 6, display: "block" }}>Organisation GSTIN (Optional)</label>
+                                <label style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 6, display: "block" }}>Organisation GSTIN *</label>
                                 <input className="input" placeholder="e.g. 27AABCE1234F1Z5" value={orgGstin} onChange={(e) => setOrgGstin(e.target.value)} style={{ fontFamily: "monospace" }} />
-                                <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4 }}>Adds a verification badge to your profile</div>
+                                <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4 }}>Required for org verification and on-chain GST hash binding</div>
                             </div>
                             <div>
                                 <label style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 6, display: "block" }}>Description</label>
@@ -173,7 +268,7 @@ export default function CreatePage() {
                         <button
                             className="btn btn-primary"
                             style={{ width: "100%", marginTop: 24 }}
-                            disabled={!orgName}
+                            disabled={!orgName || !orgGstin.trim()}
                             onClick={() => setStep(1)}
                         >
                             Next: Campaign Info <ArrowRight size={15} />
@@ -295,8 +390,8 @@ export default function CreatePage() {
                         </div>
                         <div style={{ display: "flex", gap: 10 }}>
                             <button className="btn btn-ghost" onClick={() => setStep(2)}><ArrowLeft size={15} /> Back</button>
-                            <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleSubmit} disabled={loading}>
-                                {loading ? "Creating..." : "🚀 Launch Campaign"}
+                            <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleSubmit} disabled={loading || gstinChecking}>
+                                {loading || gstinChecking ? "Creating..." : "🚀 Launch Campaign"}
                             </button>
                         </div>
                     </div>

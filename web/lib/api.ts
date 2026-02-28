@@ -1,7 +1,13 @@
 import axios from "axios";
 
+const rawBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080/api";
+const trimmedBaseUrl = rawBaseUrl.replace(/\/+$/, "");
+const normalizedBaseUrl = trimmedBaseUrl.endsWith("/api")
+    ? trimmedBaseUrl
+    : `${trimmedBaseUrl}/api`;
+
 const api = axios.create({
-    baseURL: process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080/api",
+    baseURL: normalizedBaseUrl,
 });
 
 // Attach Privy token to every request if stored in localStorage
@@ -38,6 +44,19 @@ export async function createCampaignMeta(body: Record<string, unknown>) {
     return data.campaign as Campaign;
 }
 
+export async function patchCampaignOnchain(
+    campaignId: string,
+    body: {
+        onchainProjectPda?: string;
+        onchainVaultPda?: string;
+        projectIdBytes?: string;
+        onchainOrgPda?: string;
+    }
+) {
+    const { data } = await api.patch(`/campaigns/${campaignId}/onchain`, body);
+    return data.campaign;
+}
+
 // ── Org helpers ────────────────────────────────────────────────────────────
 
 export async function fetchOrg(wallet: string) {
@@ -47,7 +66,42 @@ export async function fetchOrg(wallet: string) {
 
 export async function createOrgMeta(body: Record<string, unknown>) {
     const { data } = await api.post("/orgs", body);
-    return data.org as Org;
+    return data as {
+        org: Org;
+        gstinHashHex: string;
+        gstinHashBytes: number[];
+        gstWarning?: string;
+    };
+}
+
+export async function verifyOrgGstin(gstin: string) {
+    const { data } = await api.post("/orgs/gstin/verify", { gstin });
+    return data as {
+        gstin: string;
+        gstinHashHex: string;
+        gstinHashBytes: number[];
+        gstProfile: {
+            legalName?: string;
+            tradeName?: string;
+            state?: string;
+            stateCode?: string;
+            status?: string;
+            registrationDate?: string;
+        };
+        warning?: string;
+    };
+}
+
+// ── Donation helpers ──────────────────────────────────────────────────────
+
+export async function recordSolDonation(body: {
+    campaignId: string;
+    amountLamports: number;
+    txSignature: string;
+    donorWallet: string;
+}) {
+    const { data } = await api.post("/donations/sol", body);
+    return data;
 }
 
 // ── Auth ───────────────────────────────────────────────────────────────────
@@ -93,12 +147,17 @@ export async function submitMilestoneProof(milestoneId: string, body: {
     isUnregisteredVendor?: boolean;
     invoiceS3Key: string;
     invoiceNumber?: string;
-    invoiceAmount?: number;
-    onchainProofUri?: string;
+    invoiceAmountPaise?: number;
+    proofNote?: string;
     votingWindowSecs?: number;
 }) {
     const { data } = await api.post(`/milestones/${milestoneId}/proof`, body);
     return data;
+}
+
+export async function confirmMilestoneProofOnchain(milestoneId: string, body: { onchainProofUri: string; txSignature?: string }) {
+    const { data } = await api.post(`/milestones/${milestoneId}/proof/onchain-confirmed`, body);
+    return data as { success: boolean; txSignature?: string };
 }
 
 export async function postMilestoneUpdate(milestoneId: string, body: {
@@ -194,12 +253,13 @@ export interface MilestoneProof {
     vendorLegalName?: string;
     vendorState?: string;
     invoiceNumber?: string;
-    invoiceAmount?: number;
+    invoiceAmountPaise?: string;
     invoiceS3Key?: string;
     invoiceHash: string;
     prevProofHash?: string;
     isUnregisteredVendor: boolean;
-    createdAt: string;
+    onchainProofUri?: string;
+    submittedAt: string;
 }
 
 export interface MilestoneUpdate {
@@ -220,6 +280,7 @@ export interface MilestoneChainItem {
     state: string;
     proof?: MilestoneProof;
     updates: MilestoneUpdate[];
+    updateCount?: number;
 }
 
 // Legacy types kept for compat

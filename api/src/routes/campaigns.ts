@@ -132,7 +132,11 @@ campaignsRouter.get("/:id", async (req, res) => {
         const campaign = await prisma.campaign.findUnique({
             where: { id: req.params.id },
             include: {
-                org: true,
+                org: {
+                    include: {
+                        user: { select: { walletAddress: true } },
+                    },
+                },
                 milestones: { orderBy: { index: "asc" } },
                 donations: {
                     orderBy: { createdAt: "desc" },
@@ -157,6 +161,10 @@ campaignsRouter.get("/:id", async (req, res) => {
         res.json({
             campaign: {
                 ...campaign,
+                org: {
+                    ...campaign.org,
+                    walletAddress: campaign.org.user?.walletAddress ?? null,
+                },
                 totalGoalLamports: campaign.totalGoalLamports.toString(),
                 raisedLamports: campaign.raisedLamports.toString(),
                 prefrontLamports: campaign.prefrontLamports.toString(),
@@ -227,6 +235,35 @@ campaignsRouter.post("/:id/milestones/:index/upload-proof", requireAuth, async (
         res.json({ uploadUrl, publicUrl, proofUri: publicUrl, windowSecs });
     } catch (err) {
         console.error("[campaigns/upload-proof]", err);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+
+/**
+ * PATCH /api/campaigns/:id/onchain
+ * Save PDA addresses after on-chain create_project tx.
+ */
+campaignsRouter.patch("/:id/onchain", requireAuth, async (req: AuthedRequest, res) => {
+    try {
+        const { onchainProjectPda, onchainVaultPda, projectIdBytes, onchainOrgPda } = req.body;
+        const campaign = await prisma.campaign.update({
+            where: { id: req.params.id as string },
+            data: {
+                ...(onchainProjectPda ? { onchainProjectPda } : {}),
+                ...(onchainVaultPda ? { onchainVaultPda } : {}),
+                ...(projectIdBytes ? { projectIdBytes } : {}),
+            },
+        });
+        if (onchainOrgPda && campaign.orgId) {
+            await prisma.org.update({
+                where: { id: campaign.orgId },
+                data: { onchainPda: onchainOrgPda },
+            }).catch(() => { });
+        }
+        res.json({ campaign: { ...campaign, totalGoalLamports: campaign.totalGoalLamports.toString(), raisedLamports: campaign.raisedLamports.toString() } });
+    } catch (err) {
+        console.error("[campaigns/onchain]", err);
         res.status(500).json({ error: "Internal server error" });
     }
 });

@@ -466,6 +466,7 @@ milestonesRouter.get("/campaign/:campaignId/proof-chain", async (req, res) => {
         });
 
         const chain = milestones.map(m => ({
+            id: m.id,
             index: m.index,
             title: m.title,
             dprPhaseLabel: m.dprPhaseLabel,
@@ -483,6 +484,7 @@ milestonesRouter.get("/campaign/:campaignId/proof-chain", async (req, res) => {
                     submittedAt: m.proof.submittedAt,
                 }
                 : null,
+            updates: m.updates,
             updateCount: m.updates.length,
         }));
 

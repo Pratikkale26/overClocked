@@ -1,175 +1,148 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { useConnection, useWallet } from "@solana/wallet-adapter-react";
+import { PublicKey } from "@solana/web3.js";
+import { AnchorProvider } from "@coral-xyz/anchor";
 import { toast } from "sonner";
-import { ThumbsUp, ThumbsDown, AlertCircle, CheckCircle, Shield } from "lucide-react";
-import type { Milestone, MilestoneProof } from "../../lib/api";
-import { formatSol } from "../../lib/utils";
+import { ThumbsUp, ThumbsDown, CheckCircle, Shield, AlertCircle } from "lucide-react";
+import type { Milestone, MilestoneProof, Campaign } from "../../lib/api";
+import { formatSol, LAMPORTS_PER_SOL } from "../../lib/utils";
+import {
+    getProgram, buildVoteMilestoneTx, fetchProjectAccount,
+    fetchDonorRecord, hexToProjectId, deriveProjectPDA,
+} from "../../lib/anchor";
 
-interface VotingPanelProps {
+interface Props {
     milestone: Milestone;
     proof: MilestoneProof | null;
-    campaignId: string;
-    raisedLamports: string;
+    campaign: Campaign;
     onVoted?: () => void;
 }
 
-const LAMPORTS_PER_SOL = 1_000_000_000;
-
-export function VotingPanel({ milestone, proof, raisedLamports, onVoted }: VotingPanelProps) {
+export function VotingPanel({ milestone, proof, campaign, onVoted }: Props) {
     const [voted, setVoted] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [tally, setTally] = useState<{ yes: number; no: number; eligible: number } | null>(null);
+    const { connection } = useConnection();
+    const { publicKey, sendTransaction } = useWallet();
 
     if (milestone.state !== "UNDER_REVIEW") return null;
 
-    const now = Date.now();
-    const totalEligible = Number(raisedLamports) / LAMPORTS_PER_SOL;
+    const walletAddr = publicKey?.toBase58();
 
-    // Mock tally from proof — in production fetched from on-chain
-    const mockYes = totalEligible * 0.62;
-    const mockNo = totalEligible * 0.14;
-    const mockTotal = mockYes + mockNo;
-    const yesPercent = mockTotal > 0 ? (mockYes / mockTotal) * 100 : 0;
+    const resolvePDA = useCallback((): PublicKey | null => {
+        if (campaign.onchainProjectPda) return new PublicKey(campaign.onchainProjectPda);
+        if (campaign.projectIdBytes && campaign.org?.walletAddress) {
+            const [pda] = deriveProjectPDA(new PublicKey(campaign.org.walletAddress), hexToProjectId(campaign.projectIdBytes));
+            return pda;
+        }
+        return null;
+    }, [campaign.onchainProjectPda, campaign.projectIdBytes, campaign.org?.walletAddress]);
 
-    const handleVote = async (approve: boolean) => {
+    useEffect(() => {
+        const run = async () => {
+            const pda = resolvePDA();
+            if (!pda) return;
+            try {
+                const provider = new AnchorProvider(connection, {} as any, { commitment: "confirmed" });
+                const program = getProgram(provider);
+                const project = await fetchProjectAccount(program, pda);
+                if (project?.milestones?.[milestone.index]) {
+                    const m = project.milestones[milestone.index];
+                    setTally({ yes: Number(m.voteYes) / LAMPORTS_PER_SOL, no: Number(m.voteNo) / LAMPORTS_PER_SOL, eligible: Number(m.totalEligible) / LAMPORTS_PER_SOL });
+                }
+                if (walletAddr) {
+                    const rec = await fetchDonorRecord(program, pda, new PublicKey(walletAddr));
+                    if (rec && (Number(rec.votedBitmap) & (1 << milestone.index)) !== 0) setVoted(true);
+                }
+            } catch { /* read-only fail is ok */ }
+        };
+        run();
+    }, [connection, resolvePDA, milestone.index, walletAddr]);
+
+    const totalVotes = (tally?.yes ?? 0) + (tally?.no ?? 0);
+    const yesPct = totalVotes > 0 ? ((tally?.yes ?? 0) / totalVotes) * 100 : 0;
+
+    const vote = async (approve: boolean) => {
+        if (!walletAddr) { toast.error("Connect your wallet to vote"); return; }
+        const pda = resolvePDA();
+        if (!pda) { toast.error("Campaign not yet on-chain"); return; }
         setLoading(true);
         try {
-            // In production: sign vote_milestone tx via Privy wallet, then call backend
-            await new Promise((r) => setTimeout(r, 800)); // mock tx latency
+            const provider = new AnchorProvider(connection, {} as any, { commitment: "confirmed" });
+            const tx = await buildVoteMilestoneTx(getProgram(provider), new PublicKey(walletAddr), pda, milestone.index, approve);
+            await sendTransaction(tx, connection);
             setVoted(true);
-            toast.success(approve ? "Voted YES ✅" : "Voted NO ❌", {
-                description: "Your stake-weighted vote has been recorded on-chain.",
-            });
+            toast.success(approve ? "Voted YES ✅" : "Voted NO ❌", { description: "Stake-weighted vote recorded on-chain." });
             onVoted?.();
-        } catch {
-            toast.error("Vote failed — please try again");
-        } finally {
-            setLoading(false);
-        }
+        } catch (e: unknown) {
+            const msg = e instanceof Error ? e.message : "Transaction failed";
+            if (msg.includes("AlreadyVoted")) { setVoted(true); toast.info("Already voted"); }
+            else if (msg.includes("NoDonorRecord")) { toast.error("You need to donate first to vote"); }
+            else { toast.error("Vote failed", { description: msg }); }
+        } finally { setLoading(false); }
     };
 
     return (
-        <div style={{
-            border: "1px solid rgba(245,158,11,0.3)",
-            background: "rgba(245,158,11,0.04)",
-            borderRadius: 16,
-            padding: "24px",
-            marginBottom: 24,
-        }}>
+        <div className="border border-amber-500/25 bg-amber-500/[0.03] rounded-2xl p-6 mb-6">
             {/* Header */}
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
-                <div style={{
-                    width: 10, height: 10, borderRadius: "50%",
-                    background: "var(--warning)",
-                    boxShadow: "0 0 8px var(--warning)",
-                    animation: "pulse 1.5s ease-in-out infinite",
-                }} />
-                <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0, color: "var(--warning)" }}>
+            <div className="flex items-center gap-2.5 mb-5">
+                <span className="w-2 h-2 rounded-full bg-amber-400 shadow-[0_0_8px_#f59e0b] animate-pulse" />
+                <h3 className="text-base font-bold text-amber-400">
                     Voting Open — Phase {milestone.index + 1}: {milestone.title}
                 </h3>
             </div>
 
             {/* Proof summary */}
             {proof && (
-                <div style={{
-                    background: "var(--bg-elevated)",
-                    borderRadius: 12,
-                    padding: "14px 16px",
-                    marginBottom: 18,
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 8,
-                }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 4 }}>
-                        Proof submitted for review:
-                    </div>
-
-                    {/* GSTIN status */}
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        {proof.gstinVerified ? (
-                            <Shield size={14} style={{ color: "var(--success)", flexShrink: 0 }} />
-                        ) : proof.isUnregisteredVendor ? (
-                            <AlertCircle size={14} style={{ color: "var(--warning)", flexShrink: 0 }} />
-                        ) : null}
-                        <span style={{ fontSize: 13 }}>
-                            {proof.isUnregisteredVendor ? (
-                                <span style={{ color: "var(--warning)" }}>⚠️ Unregistered vendor (below GST threshold)</span>
-                            ) : proof.gstinVerified ? (
-                                <>
-                                    <span style={{ color: "var(--success)" }}>✅ {proof.vendorLegalName}</span>
-                                    <span style={{ fontSize: 11, color: "var(--text-muted)", marginLeft: 8 }}>GSTIN: {proof.gstin}</span>
-                                </>
-                            ) : (
-                                <span style={{ color: "var(--text-muted)" }}>GSTIN pending verification</span>
-                            )}
+                <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-4 mb-5 space-y-2">
+                    <p className="text-xs font-semibold text-white/40 uppercase tracking-wider">Submitted proof</p>
+                    <div className="flex items-center gap-2">
+                        {proof.gstinVerified ? <Shield size={13} className="text-emerald-400 shrink-0" /> : proof.isUnregisteredVendor ? <AlertCircle size={13} className="text-amber-400 shrink-0" /> : null}
+                        <span className="text-sm">
+                            {proof.isUnregisteredVendor
+                                ? <span className="text-amber-400">Unregistered vendor (below GST threshold)</span>
+                                : proof.gstinVerified
+                                    ? <><span className="text-emerald-400 font-semibold">{proof.vendorLegalName}</span><span className="text-white/30 text-xs ml-2">{proof.gstin}</span></>
+                                    : <span className="text-white/30">GSTIN pending</span>}
                         </span>
                     </div>
-
                     {proof.invoiceNumber && (
-                        <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
-                            Invoice #{proof.invoiceNumber}
-                            {proof.invoiceAmount ? ` · ₹${proof.invoiceAmount.toLocaleString()}` : ""}
-                        </div>
+                        <p className="text-xs text-white/30">Invoice #{proof.invoiceNumber}{proof.invoiceAmountPaise ? ` · ₹${(Number(proof.invoiceAmountPaise) / 100).toLocaleString("en-IN")}` : ""}</p>
                     )}
-
-                    {/* Hash */}
-                    <div style={{ fontSize: 10, fontFamily: "monospace", color: "var(--text-muted)", marginTop: 2 }}>
-                        SHA-256: {proof.invoiceHash?.slice(0, 24)}…
-                    </div>
+                    <p className="text-[10px] font-mono text-white/20">SHA-256: {proof.invoiceHash?.slice(0, 24)}…</p>
                 </div>
             )}
 
-            {/* Live tally */}
-            <div style={{ marginBottom: 20 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 6 }}>
-                    <span style={{ color: "var(--success)", fontWeight: 600 }}>YES {mockYes.toFixed(2)} SOL ({yesPercent.toFixed(0)}%)</span>
-                    <span style={{ color: "var(--danger)", fontWeight: 600 }}>NO {mockNo.toFixed(2)} SOL</span>
+            {/* Tally */}
+            <div className="mb-5">
+                <div className="flex justify-between text-sm font-semibold mb-2">
+                    <span className="text-emerald-400">YES {tally ? tally.yes.toFixed(2) : "—"} SOL ({yesPct.toFixed(0)}%)</span>
+                    <span className="text-red-400">NO {tally ? tally.no.toFixed(2) : "—"} SOL</span>
                 </div>
-                <div className="progress-track" style={{ height: 10 }}>
-                    <div className="progress-fill" style={{ width: `${yesPercent}%`, background: "linear-gradient(90deg, var(--success), #4ade80)" }} />
+                <div className="h-2 bg-white/[0.04] rounded-full overflow-hidden">
+                    <div className="h-full bg-gradient-to-r from-emerald-500 to-emerald-400 rounded-full transition-all duration-700 progress-glow" style={{ width: `${yesPct}%` }} />
                 </div>
-                <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 6 }}>
-                    {formatSol(raisedLamports)} total eligible · 51% threshold · 10% quorum
-                </div>
+                <p className="text-xs text-white/30 mt-2">
+                    {tally ? `${tally.eligible.toFixed(2)} SOL eligible` : formatSol(campaign.raisedLamports) + " total"} · 51% threshold · 10% quorum
+                </p>
             </div>
 
-            {/* Vote buttons */}
+            {/* Buttons */}
             {voted ? (
-                <div style={{
-                    display: "flex", alignItems: "center", gap: 10, padding: "14px 18px",
-                    background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.25)",
-                    borderRadius: 12, fontSize: 14, color: "var(--success)", fontWeight: 600,
-                }}>
-                    <CheckCircle size={16} />
-                    Your vote is recorded on-chain. Weight = your donated SOL.
+                <div className="flex items-center gap-2.5 p-4 rounded-xl bg-emerald-500/8 border border-emerald-500/20 text-emerald-400 font-semibold text-sm">
+                    <CheckCircle size={16} /> Vote recorded on-chain. Weight = your donated SOL.
                 </div>
             ) : (
-                <div style={{ display: "flex", gap: 12 }}>
-                    <button
-                        className="btn"
-                        disabled={loading}
-                        onClick={() => handleVote(true)}
-                        style={{
-                            flex: 1, padding: "14px", fontSize: 15, fontWeight: 700,
-                            background: "rgba(34,197,94,0.12)", color: "var(--success)",
-                            border: "1px solid rgba(34,197,94,0.3)", borderRadius: 12,
-                        }}
-                    >
-                        <ThumbsUp size={16} />
-                        {loading ? "Signing…" : "Approve"}
+                <div className="grid grid-cols-2 gap-3">
+                    <button disabled={loading || !walletAddr} onClick={() => vote(true)}
+                        className="flex items-center justify-center gap-2 py-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 font-bold hover:bg-emerald-500/20 disabled:opacity-40 transition-all">
+                        <ThumbsUp size={15} /> {loading ? "Signing…" : "Approve"}
                     </button>
-                    <button
-                        className="btn"
-                        disabled={loading}
-                        onClick={() => handleVote(false)}
-                        style={{
-                            flex: 1, padding: "14px", fontSize: 15, fontWeight: 700,
-                            background: "rgba(239,68,68,0.08)", color: "var(--danger)",
-                            border: "1px solid rgba(239,68,68,0.25)", borderRadius: 12,
-                        }}
-                    >
-                        <ThumbsDown size={16} />
-                        {loading ? "Signing…" : "Reject"}
+                    <button disabled={loading || !walletAddr} onClick={() => vote(false)}
+                        className="flex items-center justify-center gap-2 py-3.5 rounded-xl bg-red-500/8 border border-red-500/20 text-red-400 font-bold hover:bg-red-500/15 disabled:opacity-40 transition-all">
+                        <ThumbsDown size={15} /> {loading ? "Signing…" : "Reject"}
                     </button>
                 </div>
             )}

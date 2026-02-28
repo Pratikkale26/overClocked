@@ -141,6 +141,54 @@ donationsRouter.post("/upi-webhook", async (req: Request, res: Response) => {
 });
 
 /**
+ * POST /api/donations/sol
+ * Record an on-chain SOL donation after the donor's tx confirms.
+ */
+donationsRouter.post("/sol", requireAuth, async (req: AuthedRequest, res) => {
+    try {
+        const { campaignId, amountLamports, txSignature, donorWallet } = req.body;
+
+        if (!campaignId || !amountLamports || !txSignature) {
+            res.status(400).json({ error: "campaignId, amountLamports, and txSignature required" });
+            return;
+        }
+
+        const campaign = await prisma.campaign.findUnique({ where: { id: campaignId } });
+        if (!campaign) { res.status(404).json({ error: "Campaign not found" }); return; }
+
+        // Prevent duplicate recording
+        const existing = await prisma.donation.findUnique({ where: { txSignature } });
+        if (existing) { res.json({ donation: { ...existing, amountLamports: existing.amountLamports.toString() } }); return; }
+
+        const user = await prisma.user.findUnique({ where: { privyId: req.user!.privyId } });
+
+        const [donation] = await prisma.$transaction([
+            prisma.donation.create({
+                data: {
+                    campaignId,
+                    userId: user?.id,
+                    donorWallet: donorWallet ?? user?.walletAddress,
+                    amountLamports: BigInt(amountLamports),
+                    paymentType: "SOL",
+                    txSignature,
+                    confirmed: true,
+                },
+            }),
+            prisma.campaign.update({
+                where: { id: campaignId },
+                data: { raisedLamports: { increment: BigInt(amountLamports) } },
+            }),
+        ]);
+
+        res.status(201).json({ donation: { ...donation, amountLamports: donation.amountLamports.toString() } });
+    } catch (err: any) {
+        if (err.code === "P2002") { res.json({ ok: true, msg: "Donation already recorded" }); return; }
+        console.error("[donations/sol]", err);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+/**
  * GET /api/donations/:campaignId
  * List confirmed donations for a campaign.
  */

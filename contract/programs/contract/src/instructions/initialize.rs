@@ -1,9 +1,3 @@
-use anchor_lang::prelude::*;
-
-#[derive(Accounts)]
-pub struct Initialize {}
-
-pub fn handler(ctx: Context<Initialize>) -> Result<()> {
-    msg!("Greetings from: {:?}", ctx.program_id);
-    Ok(())
-}
+// This file is intentionally left as a stub.
+// The original scaffold `initialize` instruction has been replaced by
+// `initialize_platform` in the Credence program. See instructions/mod.rs.

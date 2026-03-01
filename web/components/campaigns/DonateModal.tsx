@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { usePrivy } from "@privy-io/react-auth";
+import { useSendTransaction } from "@privy-io/react-auth/solana";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
 import { AnchorProvider } from "@coral-xyz/anchor";
@@ -20,12 +22,26 @@ export function DonateModal({ campaign, open, onClose, onSuccess }: Props) {
   const [amount, setAmount] = useState("");
   const [loading, setLoading] = useState(false);
   const [txSig, setTxSig] = useState<string | null>(null);
+  const { user } = usePrivy();
+  const { sendTransaction: sendPrivyTransaction } = useSendTransaction();
   const { connection } = useConnection();
-  const { publicKey, sendTransaction } = useWallet();
+  const { publicKey, sendTransaction: sendWalletAdapterTransaction } = useWallet();
 
   if (!open) return null;
 
-  const walletAddr = publicKey?.toBase58();
+  const linkedSolanaAccount = user?.linkedAccounts?.find(
+    (account) =>
+      account.type === "wallet" &&
+      "chainType" in account &&
+      account.chainType === "solana"
+  );
+  const linkedAddr =
+    linkedSolanaAccount &&
+    "address" in linkedSolanaAccount &&
+    typeof linkedSolanaAccount.address === "string"
+      ? linkedSolanaAccount.address
+      : undefined;
+  const walletAddr = publicKey?.toBase58() ?? user?.wallet?.address ?? linkedAddr;
 
   const resolveProjectPDA = (): PublicKey | null => {
     if (campaign.onchainProjectPda) return new PublicKey(campaign.onchainProjectPda);
@@ -46,9 +62,14 @@ export function DonateModal({ campaign, open, onClose, onSuccess }: Props) {
     setLoading(true);
     try {
       const lamports = Math.floor(amountSol * LAMPORTS_PER_SOL);
-      const provider = new AnchorProvider(connection, {} as any, { commitment: "confirmed" });
+      const provider = new AnchorProvider(connection, {} as never, { commitment: "confirmed" });
       const tx = await buildDonateTx(getProgram(provider), new PublicKey(walletAddr), projectPDA, lamports);
-      const sig = await sendTransaction(tx, connection);
+      const { blockhash } = await connection.getLatestBlockhash("confirmed");
+      tx.feePayer = new PublicKey(walletAddr);
+      tx.recentBlockhash = blockhash;
+      const sig = publicKey
+        ? await sendWalletAdapterTransaction(tx, connection)
+        : (await sendPrivyTransaction({ transaction: tx, connection, address: walletAddr })).signature;
       setTxSig(sig);
       try { await recordSolDonation({ campaignId: campaign.id, amountLamports: lamports, txSignature: sig, donorWallet: walletAddr }); }
       catch (e) { console.warn("Backend record failed (non-critical):", e); }

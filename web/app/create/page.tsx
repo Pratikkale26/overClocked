@@ -29,6 +29,15 @@ import {
 } from "../../lib/anchor";
 
 const STEPS = ["Organisation", "Campaign", "Milestones", "Launch"];
+const SOLSCAN_CLUSTER_SUFFIX = process.env.NEXT_PUBLIC_SOLANA_RPC?.includes("devnet")
+  ? "?cluster=devnet"
+  : process.env.NEXT_PUBLIC_SOLANA_RPC?.includes("testnet")
+    ? "?cluster=testnet"
+    : "";
+
+function solscanTxUrl(signature: string) {
+  return `https://solscan.io/tx/${signature}${SOLSCAN_CLUSTER_SUFFIX}`;
+}
 
 interface MilestoneForm {
   title: string;
@@ -192,12 +201,20 @@ export default function CreatePage() {
       if (!existingOrg) {
         toast.info("Creating org on-chain...", { description: "Approve the transaction." });
         const createOrgTx = await prepareTx(await buildCreateOrgTx(program, creatorPubkey, gst.gstinHashBytes));
+        let orgSig: string;
         if (publicKey) {
-          await sendWalletAdapterTransaction(createOrgTx, connection);
+          orgSig = await sendWalletAdapterTransaction(createOrgTx, connection);
         } else {
-          await sendPrivyTransaction({ transaction: createOrgTx, connection, address: walletAddress });
+          const receipt = await sendPrivyTransaction({ transaction: createOrgTx, connection, address: walletAddress });
+          orgSig = receipt.signature;
         }
-        toast.success("Org created on-chain");
+        toast.success("Org created on-chain", {
+          description: `Tx: ${orgSig.slice(0, 8)}...${orgSig.slice(-8)}`,
+          action: {
+            label: "Solscan",
+            onClick: () => window.open(solscanTxUrl(orgSig), "_blank", "noopener,noreferrer"),
+          },
+        });
       }
 
       try {
@@ -253,11 +270,13 @@ export default function CreatePage() {
         })),
       });
       const preparedCreateProjectTx = await prepareTx(createProjectTx);
+      let createProjectSig: string;
 
       if (publicKey) {
-        await sendWalletAdapterTransaction(preparedCreateProjectTx, connection);
+        createProjectSig = await sendWalletAdapterTransaction(preparedCreateProjectTx, connection);
       } else {
-        await sendPrivyTransaction({ transaction: preparedCreateProjectTx, connection, address: walletAddress });
+        const receipt = await sendPrivyTransaction({ transaction: preparedCreateProjectTx, connection, address: walletAddress });
+        createProjectSig = receipt.signature;
       }
 
       await patchCampaignOnchain(campaign.id, {
@@ -267,7 +286,13 @@ export default function CreatePage() {
         onchainOrgPda: orgPdaAddress,
       });
 
-      toast.success("Campaign launched", { description: "Your campaign is live." });
+      toast.success("Campaign launched", {
+        description: "Your campaign is live.",
+        action: {
+          label: "Solscan",
+          onClick: () => window.open(solscanTxUrl(createProjectSig), "_blank", "noopener,noreferrer"),
+        },
+      });
       router.push(`/campaign/${campaign.id}`);
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : "Unknown error";

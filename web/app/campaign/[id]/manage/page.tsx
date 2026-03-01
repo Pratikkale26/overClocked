@@ -9,8 +9,8 @@ import { Navbar } from "../../../../components/layout/Navbar";
 import { DprTimeline } from "../../../../components/campaigns/DprTimeline";
 import {
     fetchCampaign, fetchMilestoneUpdates, postMilestoneUpdate,
-    submitMilestoneProof, presignProofUpload,
-    type Campaign, type Milestone, type MilestoneUpdate,
+    submitMilestoneProof, presignProofUpload, fetchMilestoneProof,
+    type Campaign, type Milestone, type MilestoneUpdate, type MilestoneProof,
 } from "../../../../lib/api";
 
 const UPDATE_TYPES = ["PROGRESS", "EXPENSE", "PHOTO", "COMPLETION", "ANNOUNCEMENT"];
@@ -19,11 +19,12 @@ const inputCls = "w-full px-4 py-3 rounded-xl bg-[#161625] border border-white/[
 
 export default function ManageCampaignPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params);
-    const { authenticated, login } = usePrivy();
+    const { authenticated, login, user } = usePrivy();
     const [campaign, setCampaign] = useState<Campaign | null>(null);
     const [loading, setLoading] = useState(true);
     const [activeMilestone, setActiveMilestone] = useState<Milestone | null>(null);
     const [updates, setUpdates] = useState<MilestoneUpdate[]>([]);
+    const [proof, setProof] = useState<MilestoneProof | null>(null);
 
     const [proofLoading, setProofLoading] = useState(false);
     const [invoiceFile, setInvoiceFile] = useState<File | null>(null);
@@ -42,15 +43,30 @@ export default function ManageCampaignPage({ params }: { params: Promise<{ id: s
         try {
             const c = await fetchCampaign(id);
             setCampaign(c);
-            const target = c.milestones?.find((m) => m.state === "PENDING" || m.state === "UNDER_REVIEW") ?? c.milestones?.[0];
-            if (target) {
-                setActiveMilestone(target);
-                setUpdates(await fetchMilestoneUpdates(target.id));
+            if (!activeMilestone || !c.milestones.some((m) => m.id === activeMilestone.id)) {
+                const target = c.milestones?.find((m) => m.state === "PENDING" || m.state === "UNDER_REVIEW") ?? c.milestones?.[0];
+                if (target) setActiveMilestone(target);
             }
         } catch { setCampaign(null); } finally { setLoading(false); }
-    }, [id]);
+    }, [activeMilestone, id]);
 
     useEffect(() => { load(); }, [load]);
+
+    useEffect(() => {
+        if (!activeMilestone) {
+            setUpdates([]);
+            setProof(null);
+            return;
+        }
+        (async () => {
+            const [u, p] = await Promise.allSettled([
+                fetchMilestoneUpdates(activeMilestone.id),
+                fetchMilestoneProof(activeMilestone.id),
+            ]);
+            setUpdates(u.status === "fulfilled" ? u.value : []);
+            setProof(p.status === "fulfilled" ? p.value : null);
+        })();
+    }, [activeMilestone]);
 
     const handleSubmitProof = async () => {
         if (!activeMilestone) return;
@@ -59,7 +75,15 @@ export default function ManageCampaignPage({ params }: { params: Promise<{ id: s
         setProofLoading(true);
         try {
             const { uploadUrl, s3Key } = await presignProofUpload(activeMilestone.id, invoiceFile.name, invoiceFile.type);
-            await fetch(uploadUrl, { method: "PUT", body: invoiceFile, headers: { "Content-Type": invoiceFile.type } });
+            const putRes = await fetch(uploadUrl, {
+                method: "PUT",
+                body: invoiceFile,
+                headers: { "Content-Type": invoiceFile.type },
+            });
+            if (!putRes.ok) {
+                const detail = await putRes.text().catch(() => "");
+                throw new Error(`File upload failed (${putRes.status})${detail ? `: ${detail}` : ""}`);
+            }
             await submitMilestoneProof(activeMilestone.id, {
                 gstin: isUnregistered ? undefined : gstin.toUpperCase().trim(),
                 isUnregisteredVendor: isUnregistered, invoiceS3Key: s3Key,
@@ -69,6 +93,7 @@ export default function ManageCampaignPage({ params }: { params: Promise<{ id: s
             });
             toast.success("Proof submitted!", { description: `Voting open for ${votingHours}h.` });
             await load();
+            setProof(await fetchMilestoneProof(activeMilestone.id));
         } catch (e: unknown) {
             toast.error("Proof submission failed", { description: e instanceof Error ? e.message : "Error" });
         } finally { setProofLoading(false); }
@@ -81,7 +106,7 @@ export default function ManageCampaignPage({ params }: { params: Promise<{ id: s
             await postMilestoneUpdate(activeMilestone.id, { type: updateType, title: updateTitle.trim(), description: updateDesc.trim() || undefined });
             toast.success("Update posted!");
             setUpdateTitle(""); setUpdateDesc("");
-            await load();
+            setUpdates(await fetchMilestoneUpdates(activeMilestone.id));
         } catch (e: unknown) {
             toast.error("Failed", { description: e instanceof Error ? e.message : "Error" });
         } finally { setUpdateLoading(false); }
@@ -104,8 +129,23 @@ export default function ManageCampaignPage({ params }: { params: Promise<{ id: s
     if (loading) return <div className="min-h-screen bg-[#050509] text-white"><Navbar /><main className="mx-auto max-w-[1240px] px-6 pt-12"><div className="skeleton h-52 rounded-2xl" /></main></div>;
     if (!campaign) return <div className="min-h-screen bg-[#050509] text-white"><Navbar /><main className="mx-auto max-w-[1240px] px-6 pt-20 text-center"><h2 className="text-xl font-bold">Campaign not found</h2></main></div>;
 
-    const canSubmitProof = activeMilestone?.state === "PENDING";
+    const linkedSolanaAccount = user?.linkedAccounts?.find(
+        (account) => account.type === "wallet" && "chainType" in account && account.chainType === "solana"
+    );
+    const linkedAddr =
+        linkedSolanaAccount && "address" in linkedSolanaAccount && typeof linkedSolanaAccount.address === "string"
+            ? linkedSolanaAccount.address
+            : undefined;
+    const connectedWallet = user?.wallet?.address ?? linkedAddr;
+    const isOwner = Boolean(
+        connectedWallet &&
+        campaign?.org?.walletAddress &&
+        connectedWallet.toLowerCase() === campaign.org.walletAddress.toLowerCase()
+    );
+
+    const canSubmitProof = activeMilestone?.state === "PENDING" && !proof;
     const isUnderReview = activeMilestone?.state === "UNDER_REVIEW";
+    const canPostUpdate = activeMilestone?.state === "PENDING" || activeMilestone?.state === "UNDER_REVIEW";
 
     return (
         <div className="min-h-screen bg-[#050509] text-white font-['Inter']">
@@ -121,6 +161,12 @@ export default function ManageCampaignPage({ params }: { params: Promise<{ id: s
                 <h1 className="text-2xl font-black tracking-tight bg-gradient-to-r from-violet-400 to-indigo-400 bg-clip-text text-transparent mb-1">Manage Campaign</h1>
                 <p className="text-sm text-white/40 mb-8">{campaign.title}</p>
 
+                {!isOwner && (
+                    <div className="mb-6 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-300">
+                        You are signed in, but this wallet is not the campaign owner wallet. Management actions are blocked.
+                    </div>
+                )}
+
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
 
                     {/* Left: proof */}
@@ -134,9 +180,36 @@ export default function ManageCampaignPage({ params }: { params: Promise<{ id: s
                                 {isUnderReview && <p className="text-xs text-white/40 mt-1">Donors are reviewing your proof and voting.</p>}
                             </div>
                         )}
+                        {!!campaign.milestones?.length && (
+                            <div className="flex gap-2 overflow-x-auto pb-1">
+                                {campaign.milestones.map((m) => {
+                                    const active = activeMilestone?.id === m.id;
+                                    return (
+                                        <button
+                                            key={m.id}
+                                            onClick={() => setActiveMilestone(m)}
+                                            className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${active
+                                                ? "bg-violet-500/15 border-violet-500/40 text-violet-300"
+                                                : "bg-white/[0.03] border-white/[0.06] text-white/45 hover:text-white/75"
+                                                }`}
+                                        >
+                                            Phase {m.index + 1}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        )}
 
                         <div className="bg-[#0f0f1a] border border-white/[0.06] rounded-2xl p-6">
                             <h2 className="text-sm font-bold flex items-center gap-2 mb-5"><FileText size={15} /> Submit Phase Proof</h2>
+                            {proof && (
+                                <div className="mb-4 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3">
+                                    <p className="text-xs font-semibold text-emerald-300">Proof already submitted</p>
+                                    <p className="text-[11px] text-white/40 mt-1">
+                                        Submitted on {new Date(proof.submittedAt).toLocaleString("en-IN")} · Hash {proof.invoiceHash.slice(0, 12)}...
+                                    </p>
+                                </div>
+                            )}
                             {isUnderReview ? (
                                 <p className="text-sm text-white/30 py-6 text-center">⏳ Proof submitted. Wait for voting.</p>
                             ) : !canSubmitProof ? (
@@ -180,7 +253,7 @@ export default function ManageCampaignPage({ params }: { params: Promise<{ id: s
                                             <input type="file" accept=".pdf,.jpg,.jpeg,.png" className="hidden" onChange={(e) => setInvoiceFile(e.target.files?.[0] ?? null)} />
                                         </label>
                                     </div>
-                                    <button disabled={proofLoading || !invoiceFile || (!isUnregistered && !gstin)} onClick={handleSubmitProof}
+                                    <button disabled={!isOwner || proofLoading || !invoiceFile || (!isUnregistered && !gstin)} onClick={handleSubmitProof}
                                         className="w-full py-3.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-semibold shadow-lg shadow-violet-500/20 hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed transition-all">
                                         {proofLoading ? "Uploading & Validating…" : "Submit Proof & Open Voting"}
                                     </button>
@@ -206,11 +279,11 @@ export default function ManageCampaignPage({ params }: { params: Promise<{ id: s
                                 </div>
                                 <div>
                                     <label className="block text-xs font-semibold text-white/40 uppercase tracking-wider mb-2">Details</label>
-                                    <textarea className={inputCls + " min-h-[80px] resize-y"} placeholder="Additional context for donors…" value={updateDesc} onChange={(e) => setUpdateDesc(e.target.value)} />
+                                <textarea className={inputCls + " min-h-[80px] resize-y"} placeholder="Additional context for donors…" value={updateDesc} onChange={(e) => setUpdateDesc(e.target.value)} />
                                 </div>
-                                <button disabled={updateLoading || !updateTitle.trim()} onClick={handlePostUpdate}
+                                <button disabled={!isOwner || !canPostUpdate || updateLoading || !updateTitle.trim()} onClick={handlePostUpdate}
                                     className="w-full py-3 rounded-xl border border-violet-500/30 text-violet-300 font-semibold hover:bg-violet-500/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all">
-                                    {updateLoading ? "Posting…" : "📋 Post Update"}
+                                    {updateLoading ? "Posting…" : !canPostUpdate ? "Phase Closed" : "📋 Post Update"}
                                 </button>
                             </div>
                         </div>

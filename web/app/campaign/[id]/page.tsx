@@ -3,6 +3,7 @@
 import { use, useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { ExternalLink, Users, TrendingUp, Shield, AlertCircle, Heart } from "lucide-react";
+import { usePrivy } from "@privy-io/react-auth";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { Navbar } from "../../../components/layout/Navbar";
 import { DonateModal } from "../../../components/campaigns/DonateModal";
@@ -17,6 +18,7 @@ import { formatGoalProgress, formatSol } from "../../../lib/utils";
 
 export default function CampaignDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  const { user } = usePrivy();
   const { publicKey } = useWallet();
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [loading, setLoading] = useState(true);
@@ -43,6 +45,16 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
   }, [id]);
 
   useEffect(() => { load(); }, [load]);
+
+  const selectMilestone = useCallback(async (milestone: Milestone) => {
+    setActiveMilestone(milestone);
+    const [proof, updates] = await Promise.allSettled([
+      fetchMilestoneProof(milestone.id),
+      fetchMilestoneUpdates(milestone.id),
+    ]);
+    setActiveProof(proof.status === "fulfilled" ? proof.value : null);
+    setActiveUpdates(updates.status === "fulfilled" ? updates.value : []);
+  }, []);
 
   if (loading) {
     return (
@@ -77,7 +89,19 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
   const completionRate = campaign.org ? Math.round((campaign.org.completionRateBps ?? 0) / 100) : 0;
   const trustTier = completionRate >= 80 ? "GOLD" : completionRate >= 50 ? "SILVER" : "BRONZE";
   const tierClr = trustTier === "GOLD" ? "text-amber-400" : trustTier === "SILVER" ? "text-slate-400" : "text-amber-700";
-  const connectedWallet = publicKey?.toBase58()?.toLowerCase();
+  const linkedSolanaAccount = user?.linkedAccounts?.find(
+    (account) =>
+      account.type === "wallet" &&
+      "chainType" in account &&
+      account.chainType === "solana"
+  );
+  const linkedAddr =
+    linkedSolanaAccount &&
+    "address" in linkedSolanaAccount &&
+    typeof linkedSolanaAccount.address === "string"
+      ? linkedSolanaAccount.address
+      : undefined;
+  const connectedWallet = (publicKey?.toBase58() ?? user?.wallet?.address ?? linkedAddr)?.toLowerCase();
   const creatorWallet = campaign.org?.walletAddress?.toLowerCase();
   const isSelfDonation = Boolean(connectedWallet && creatorWallet && connectedWallet === creatorWallet);
 
@@ -162,6 +186,42 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
                   <span className="text-xs text-white/25 font-normal ml-2">Proof-of-history chain</span>
                 </h2>
               </div>
+
+              {!!campaign.milestones?.length && (
+                <div className="mb-4 flex gap-2 overflow-x-auto pb-1">
+                  {campaign.milestones.map((m) => {
+                    const active = activeMilestone?.id === m.id;
+                    return (
+                      <button
+                        key={m.id}
+                        onClick={() => { void selectMilestone(m); }}
+                        className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${active
+                          ? "bg-violet-500/15 border-violet-500/40 text-violet-300"
+                          : "bg-white/[0.03] border-white/[0.06] text-white/45 hover:text-white/75"
+                          }`}
+                      >
+                        Phase {m.index + 1}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {activeMilestone && (
+                <div className="mb-4 p-3 rounded-xl border border-white/[0.07] bg-white/[0.02]">
+                  <p className="text-xs text-white/60 font-semibold mb-1">
+                    Phase {activeMilestone.index + 1}: {activeMilestone.title}
+                  </p>
+                  {activeProof ? (
+                    <p className="text-[11px] text-white/35">
+                      Proof submitted on {new Date(activeProof.submittedAt).toLocaleString("en-IN")} · Hash {activeProof.invoiceHash.slice(0, 12)}...
+                    </p>
+                  ) : (
+                    <p className="text-[11px] text-white/30">No proof submitted for this phase yet.</p>
+                  )}
+                </div>
+              )}
+
               <DprTimeline updates={activeUpdates} title="" />
               <Link href={`/campaign/${campaign.id}/audit`} className="block mt-5">
                 <button className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-white/40 text-sm font-semibold hover:bg-white/[0.06] transition-all">

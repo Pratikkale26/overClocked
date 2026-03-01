@@ -361,6 +361,20 @@ milestonesRouter.post("/:id/updates", requireAuth, async (req: AuthedRequest, re
             res.status(403).json({ error: "Only the campaign owner can post milestone updates" });
             return;
         }
+        if (milestone.state === "APPROVED" || milestone.state === "REJECTED") {
+            res.status(409).json({ error: "This milestone is closed for updates" });
+            return;
+        }
+        if (type === "COMPLETION") {
+            const existingCompletion = await prisma.milestoneUpdate.findFirst({
+                where: { milestoneId, type: "COMPLETION" },
+                select: { id: true },
+            });
+            if (existingCompletion) {
+                res.status(409).json({ error: "Completion update already posted for this milestone" });
+                return;
+            }
+        }
 
         // Compute content hash for authenticity
         const contentHash = crypto

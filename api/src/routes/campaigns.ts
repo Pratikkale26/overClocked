@@ -87,20 +87,21 @@ campaignsRouter.post("/", requireAuth, async (req: AuthedRequest, res) => {
 
 /**
  * GET /api/campaigns
- * List campaigns with optional filtering.
+ * List campaigns with optional filters.
  */
 campaignsRouter.get("/", async (req, res) => {
     try {
-        const { state, category, search, limit = "20", offset = "0" } = req.query as Record<string, string>;
+        const { limit = "10", offset = "0", orgId, state, category, search } = req.query;
 
         const campaigns = await prisma.campaign.findMany({
             where: {
+                orgId: orgId ? (orgId as string) : undefined,
                 state: state ? (state as any) : "ACTIVE",
-                category: category ? { equals: category, mode: "insensitive" } : undefined,
+                category: category ? { equals: category as string, mode: "insensitive" } : undefined,
                 OR: search
                     ? [
-                        { title: { contains: search, mode: "insensitive" } },
-                        { description: { contains: search, mode: "insensitive" } },
+                        { title: { contains: search as string, mode: "insensitive" } },
+                        { description: { contains: search as string, mode: "insensitive" } },
                     ]
                     : undefined,
             },
@@ -110,8 +111,8 @@ campaignsRouter.get("/", async (req, res) => {
                 _count: { select: { donations: true } },
             },
             orderBy: { createdAt: "desc" },
-            take: parseInt(limit),
-            skip: parseInt(offset),
+            take: parseInt(limit as string),
+            skip: parseInt(offset as string),
         });
 
         res.json({

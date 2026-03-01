@@ -1,16 +1,14 @@
+import "dotenv/config";
 import { PrivyClient } from "@privy-io/server-auth";
-import dotenv from "dotenv";
 
-dotenv.config();
-
-const privyAppId = process.env.PRIVY_APP_ID;
-const privyAppSecret = process.env.PRIVY_APP_SECRET;
+const privyAppId = process.env.PRIVY_APP_ID ?? "";
+const privyAppSecret = process.env.PRIVY_APP_SECRET ?? "";
 
 if (!privyAppId || !privyAppSecret) {
-    console.warn("⚠️ Missing PRIVY_APP_ID or PRIVY_APP_SECRET in environment variables.");
+    throw new Error(
+        "Missing PRIVY_APP_ID or PRIVY_APP_SECRET in api/.env. " +
+        "Set both and restart the API server."
+    );
 }
 
-export const privyClient = new PrivyClient(
-    privyAppId || "",
-    privyAppSecret || ""
-);
+export const privyClient = new PrivyClient(privyAppId, privyAppSecret);

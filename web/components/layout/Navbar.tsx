@@ -15,9 +15,22 @@ const NAV = [
 
 export function Navbar() {
   const pathname = usePathname();
-  const { authenticated, login, logout } = usePrivy();
+  const { authenticated, login, logout, user } = usePrivy();
   const { publicKey } = useWallet();
-  const addr = publicKey?.toBase58();
+  const adapterAddr = publicKey?.toBase58();
+  const linkedSolanaAccount = user?.linkedAccounts?.find(
+    (account) =>
+      account.type === "wallet" &&
+      "chainType" in account &&
+      account.chainType === "solana"
+  );
+  const linkedAddr =
+    linkedSolanaAccount &&
+    "address" in linkedSolanaAccount &&
+    typeof linkedSolanaAccount.address === "string"
+      ? linkedSolanaAccount.address
+      : undefined;
+  const addr = adapterAddr ?? user?.wallet?.address ?? linkedAddr;
 
   return (
     <header className="sticky top-0 z-50 border-b border-white/[0.06] bg-[#050509]/80 backdrop-blur-2xl">

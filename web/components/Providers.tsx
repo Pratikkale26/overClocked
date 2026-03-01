@@ -5,12 +5,16 @@ import { PrivyProvider, usePrivy } from "@privy-io/react-auth";
 import { toSolanaWalletConnectors } from "@privy-io/react-auth/solana";
 import { ConnectionProvider, WalletProvider } from "@solana/wallet-adapter-react";
 import { loginWithPrivy } from "../lib/api";
+import { createSolanaRpc, createSolanaRpcSubscriptions } from '@solana/kit';
+
 
 const RPC =
   process.env.NEXT_PUBLIC_SOLANA_RPC ?? "https://api.devnet.solana.com";
+  const DEVNET_WSS_URL = RPC.replace('https://', 'wss://');
+
 
 const PRIVY_APP_ID = process.env.NEXT_PUBLIC_PRIVY_APP_ID ?? "";
-const solanaConnectors = toSolanaWalletConnectors({ shouldAutoConnect: true });
+const solanaConnectors = toSolanaWalletConnectors({ shouldAutoConnect: false });
 const API_TOKEN_STORAGE_KEY = "credence:privy-access-token";
 
 // ─── Backend auth sync ────────────────────────────────────────────────────────
@@ -31,8 +35,8 @@ function ApiTokenSync({ children }: { children: ReactNode }) {
         localStorage.setItem(API_TOKEN_STORAGE_KEY, token);
         await loginWithPrivy(token);
       } catch (err) {
-        // Non-fatal — user is still logged in with Privy even if backend sync fails
-        console.warn("[Credence] Backend auth sync failed (non-critical):", err);
+        // Non-fatal — user remains logged into Privy even if API sync fails.
+        console.error("[Credence] Backend auth sync failed:", err);
       }
     })();
     return () => { cancelled = true; };
@@ -47,7 +51,7 @@ function WalletProviders({ children }: { children: ReactNode }) {
   const wallets = useMemo(() => [], []);
   return (
     <ConnectionProvider endpoint={RPC}>
-      <WalletProvider wallets={wallets} autoConnect>
+      <WalletProvider wallets={wallets} autoConnect={false}>
         <ApiTokenSync>{children}</ApiTokenSync>
       </WalletProvider>
     </ConnectionProvider>
@@ -78,8 +82,25 @@ export function Providers({ children }: { children: ReactNode }) {
           solana: { createOnLogin: "users-without-wallets" },
         },
         externalWallets: {
-          solana: { connectors: solanaConnectors },
+          solana: {
+            connectors: solanaConnectors,
+          },
         },
+
+        solana: {
+                    rpcs: {
+                        'solana:devnet': {
+                            rpc: createSolanaRpc(RPC),
+                            rpcSubscriptions: createSolanaRpcSubscriptions(DEVNET_WSS_URL),
+                            blockExplorerUrl: 'https://solscan.io/?cluster=devnet',
+                        },
+                        'solana:mainnet': {
+                            rpc: createSolanaRpc('https://api.mainnet-beta.solana.com'),
+                            rpcSubscriptions: createSolanaRpcSubscriptions('wss://api.mainnet-beta.solana.com'),
+                            blockExplorerUrl: 'https://solscan.io',
+                        },
+                    },
+                  }
       }}
     >
       <WalletProviders>{children}</WalletProviders>

@@ -1,85 +1,101 @@
 import type { Request, Response, NextFunction } from "express";
-import type { User } from "@privy-io/server-auth";
 import { privyClient } from "../lib/privy.js";
+import { loginOrCreateUser, syncPrivyAccounts } from "../services/user.service.js";
+import { prisma } from "../db.js";
 
 export interface AuthedRequest extends Request {
     user?: {
         privyId: string;
-        walletAddress?: string;
-        email?: string;
-        twitterHandle?: string;
+        walletAddress?: string | null;
+        email?: string | null;
+        twitterHandle?: string | null;
     };
 }
 
-function getWalletAddress(user: User): string | undefined {
-    const directWallet = user.wallet?.address;
-    if (directWallet) return directWallet;
-
-    const linkedWallet = user.linkedAccounts.find((a) => a.type === "wallet");
-    return linkedWallet?.address;
-}
-
-function getEmailAddress(user: User): string | undefined {
-    const directEmail = user.email?.address;
-    if (directEmail) return directEmail;
-
-    for (const account of user.linkedAccounts) {
-        if (account.type === "email" && "address" in account && account.address) {
-            return account.address;
-        }
-        if (account.type === "google_oauth" && "email" in account && account.email) {
-            return account.email;
-        }
-    }
-
-    return undefined;
-}
-
-function getTwitterHandle(user: User): string | undefined {
-    const directTwitter = user.twitter?.username;
-    if (directTwitter) return directTwitter;
-
-    const linkedTwitter = user.linkedAccounts.find((a) => a.type === "twitter_oauth");
-    return linkedTwitter?.username ?? undefined;
-}
-
+/**
+ * Auth middleware — verifies Privy access token using the official SDK.
+ * Extracts / creates User in DB and attaches req.user.
+ */
 export async function requireAuth(
     req: AuthedRequest,
     res: Response,
     next: NextFunction
 ) {
-    const authHeader = req.headers.authorization;
-    if (!authHeader?.startsWith("Bearer ")) {
-        res.status(401).json({ error: "Missing authorization header" });
-        return;
-    }
-
-    const token = authHeader.slice(7);
-    if (!process.env.PRIVY_APP_ID || !process.env.PRIVY_APP_SECRET) {
-        res.status(500).json({ error: "Server missing Privy credentials" });
-        return;
-    }
-
     try {
-        const claims = await privyClient.verifyAuthToken(token);
-        let user: User | null = null;
+        const authHeader = req.headers.authorization;
+        if (!authHeader?.startsWith("Bearer ")) {
+            res.status(401).json({ error: "Missing authorization header" });
+            return;
+        }
+
+        const token = authHeader.slice(7);
+
+        // Verify access token with Privy SDK
+        let verifiedClaims;
         try {
-            user = await privyClient.getUser(claims.userId);
-        } catch (userErr) {
-            // Keep request auth valid even if user profile fetch is rate-limited/transient.
-            console.warn("[requireAuth] Failed to fetch full Privy user profile:", userErr);
+            verifiedClaims = await privyClient.verifyAuthToken(token);
+        } catch (err) {
+            console.warn("[requireAuth] Token verification failed:", err);
+            res.status(401).json({ error: "Invalid or expired token" });
+            return;
+        }
+
+        const privyId = verifiedClaims.userId;
+
+        // Look up user in DB
+        let user = await prisma.user.findUnique({
+            where: { privyId },
+            select: {
+                id: true,
+                privyId: true,
+                walletAddress: true,
+                email: true,
+                twitterHandle: true,
+            },
+        });
+
+        // First login — create user with Privy data
+        if (!user) {
+            user = await loginOrCreateUser(privyId);
+        }
+        // Existing user but missing wallet or twitter — re-sync from Privy
+        else if (!user.walletAddress || !user.twitterHandle) {
+            const linked = await syncPrivyAccounts(privyId);
+
+            const shouldUpdate =
+                (!user.walletAddress && linked.walletAddress) ||
+                (!user.twitterHandle && linked.twitterHandle) ||
+                (!user.email && linked.email);
+
+            if (shouldUpdate) {
+                user = await prisma.user.update({
+                    where: { privyId },
+                    data: {
+                        ...(linked.walletAddress && !user.walletAddress && { walletAddress: linked.walletAddress }),
+                        ...(linked.twitterHandle && !user.twitterHandle && { twitterHandle: linked.twitterHandle }),
+                        ...(linked.email && !user.email && { email: linked.email }),
+                    },
+                    select: {
+                        id: true,
+                        privyId: true,
+                        walletAddress: true,
+                        email: true,
+                        twitterHandle: true,
+                    },
+                });
+            }
         }
 
         req.user = {
-            privyId: claims.userId,
-            walletAddress: user ? getWalletAddress(user) : undefined,
-            email: user ? getEmailAddress(user) : undefined,
-            twitterHandle: user ? getTwitterHandle(user) : undefined,
+            privyId: user.privyId,
+            walletAddress: user.walletAddress,
+            email: user.email,
+            twitterHandle: (user as any).twitterHandle ?? null,
         };
 
         next();
     } catch (err) {
-        console.error("[requireAuth] Privy token verification failed:", err);
-        res.status(401).json({ error: "Invalid or expired token" });
+        console.error("[requireAuth] Unexpected error:", err);
+        res.status(500).json({ error: "Internal auth error" });
     }
 }

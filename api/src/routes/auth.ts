@@ -2,36 +2,34 @@ import { Router } from "express";
 import { prisma } from "../db.js";
 import type { AuthedRequest } from "../middleware/auth.js";
 import { requireAuth } from "../middleware/auth.js";
-import { privyClient } from "../lib/privy.js";
+import { loginOrCreateUser, syncPrivyAccounts } from "../services/user.service.js";
 
 export const authRouter = Router();
 
 /**
  * POST /api/auth/privy
  * Called from the frontend after Privy login.
- * Upserts a User record, returns user + org (if any).
+ * Upserts a User record with linked account data (wallet, twitter, email).
  */
 authRouter.post("/privy", requireAuth, async (req: AuthedRequest, res) => {
     try {
-        const { privyId, walletAddress, email, twitterHandle: tokenTwitterHandle } = req.user!;
-        const privyUser = await privyClient.getUser(privyId).catch(() => null);
-        const twitterHandle = privyUser?.twitter?.username
-            ?? privyUser?.linkedAccounts.find((account) => account.type === "twitter_oauth")?.username
-            ?? tokenTwitterHandle
-            ?? undefined;
+        const { privyId } = req.user!;
+
+        // Re-sync from Privy to get the freshest linked accounts
+        const linked = await syncPrivyAccounts(privyId);
 
         const user = await prisma.user.upsert({
             where: { privyId },
             update: {
-                walletAddress: walletAddress ?? undefined,
-                email: email ?? undefined,
-                twitterHandle,
+                ...(linked.walletAddress && { walletAddress: linked.walletAddress }),
+                ...(linked.twitterHandle && { twitterHandle: linked.twitterHandle }),
+                ...(linked.email && { email: linked.email }),
             },
             create: {
                 privyId,
-                walletAddress,
-                email,
-                twitterHandle,
+                walletAddress: linked.walletAddress ?? null,
+                twitterHandle: linked.twitterHandle ?? null,
+                email: linked.email ?? null,
             },
             include: { org: true },
         });

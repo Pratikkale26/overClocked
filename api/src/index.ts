@@ -17,14 +17,22 @@ const allowedOrigins = (process.env.CORS_ORIGINS ?? "http://localhost:3000")
     .map((origin) => origin.trim())
     .filter(Boolean);
 
+const corsOptions: cors.CorsOptions = {
+    origin(origin, callback) {
+        // Allow same-origin/server-to-server requests without an Origin header.
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.includes(origin)) return callback(null, true);
+        return callback(new Error(`CORS origin not allowed: ${origin}`));
+    },
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: true,
+    optionsSuccessStatus: 204,
+};
+
 // Razorpay signature verification needs the exact raw request body.
 app.use("/api/donations/upi-webhook", express.raw({ type: "application/json" }));
-app.use(
-    cors({
-        origin: true, // Dynamically allow the requesting origin
-        credentials: true,
-    })
-);
+app.use(cors(corsOptions));
 app.use(express.json({ limit: "5mb" }));
 
 app.get("/health", (_req, res) => {

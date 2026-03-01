@@ -58,8 +58,9 @@ orgsRouter.post("/", requireAuth, async (req: AuthedRequest, res) => {
         const user = await prisma.user.findUnique({ where: { privyId: req.user!.privyId } });
         if (!user) { res.status(404).json({ error: "User not found" }); return; }
 
-        const { name, description, category, websiteUrl, twitterHandle, onchainPda, gstin: gstinInput } = req.body;
-        const preferredTwitterHandle = user.twitterHandle ?? twitterHandle ?? undefined;
+        const { name, description, category, websiteUrl, twitterHandle: bodyTwitter, onchainPda, gstin: gstinInput } = req.body;
+        // Auto-populate twitterHandle from user's Privy-linked X account if not provided
+        const twitterHandle = bodyTwitter || user.twitterHandle || null;
         if (!gstinInput) {
             res.status(400).json({ error: "gstin is required" });
             return;
@@ -82,7 +83,7 @@ orgsRouter.post("/", requireAuth, async (req: AuthedRequest, res) => {
                 description,
                 category: category ?? "OTHER",
                 websiteUrl,
-                twitterHandle: preferredTwitterHandle,
+                twitterHandle,
                 onchainPda,
                 onchainGstinHash: gstinHashHex,
                 gstin,
@@ -202,7 +203,7 @@ orgsRouter.post("/:id/upload-doc", requireAuth, async (req: AuthedRequest, res) 
 
         // Save the doc URL to the org
         await prisma.org.update({
-            where: { id: orgId},
+            where: { id: orgId },
             data: { docUrls: { push: publicUrl } },
         });
 

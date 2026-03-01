@@ -108,12 +108,23 @@ export async function recordSolDonation(body: {
 // ── Auth ───────────────────────────────────────────────────────────────────
 
 export async function loginWithPrivy(privyToken: string) {
-    const { data } = await api.post(
-        "/auth/privy",
-        {},
-        { headers: { Authorization: `Bearer ${privyToken}` } }
-    );
-    return data.user as User;
+    try {
+        const { data } = await api.post(
+            "/auth/privy",
+            {},
+            { headers: { Authorization: `Bearer ${privyToken}` } }
+        );
+        return data.user as User;
+    } catch (err: unknown) {
+        if (axios.isAxiosError(err)) {
+            const status = err.response?.status ?? "NO_RESPONSE";
+            const detail = typeof err.response?.data === "object"
+                ? JSON.stringify(err.response?.data)
+                : String(err.response?.data ?? err.message);
+            throw new Error(`Privy backend sync failed (${status}): ${detail}`);
+        }
+        throw err;
+    }
 }
 
 // ── Milestone / Proof / DPR helpers ───────────────────────────────────

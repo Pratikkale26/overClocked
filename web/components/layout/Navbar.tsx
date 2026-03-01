@@ -26,23 +26,23 @@ export function Navbar() {
   );
   const linkedAddr =
     linkedSolanaAccount &&
-    "address" in linkedSolanaAccount &&
-    typeof linkedSolanaAccount.address === "string"
+      "address" in linkedSolanaAccount &&
+      typeof linkedSolanaAccount.address === "string"
       ? linkedSolanaAccount.address
       : undefined;
   const addr = adapterAddr ?? user?.wallet?.address ?? linkedAddr;
 
   return (
-    <header className="sticky top-0 z-50 border-b border-white/[0.06] bg-[#050509]/80 backdrop-blur-2xl">
-      <nav className="mx-auto max-w-[1240px] px-6 flex items-center justify-between h-16 gap-4">
+    <header className="sticky top-0 z-50 border-b border-[#E4E2DC] bg-[#F8F7F4]/80 backdrop-blur-xl">
+      <nav className="mx-auto max-w-[1200px] px-8 flex items-center justify-between h-[72px] gap-6">
 
         {/* Logo */}
-        <div className="flex items-center gap-7">
-          <Link href="/" className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center text-white text-sm font-bold shadow-lg shadow-violet-500/25">
+        <div className="flex items-center gap-8">
+          <Link href="/" className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-[#2D6A4F] flex items-center justify-center text-white text-base font-bold">
               C
             </div>
-            <span className="font-extrabold text-xl tracking-tight bg-gradient-to-r from-violet-400 to-indigo-400 bg-clip-text text-transparent">
+            <span className="font-extrabold text-[22px] tracking-tight text-[#1A1F2E]">
               Credence
             </span>
           </Link>
@@ -53,11 +53,11 @@ export function Navbar() {
               const active = pathname === href;
               return (
                 <Link key={href} href={href}>
-                  <button className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${active
-                      ? "bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-lg shadow-violet-500/25"
-                      : "text-white/50 hover:text-white/80 hover:bg-white/5"
+                  <button className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-base font-semibold transition-all duration-150 min-h-[44px] ${active
+                    ? "bg-[#2D6A4F] text-white"
+                    : "text-[#1A1F2E]/50 hover:text-[#1A1F2E]/80 hover:bg-[#1A1F2E]/[0.04]"
                     }`}>
-                    <Icon size={14} />
+                    <Icon size={18} />
                     {label}
                   </button>
                 </Link>
@@ -67,28 +67,28 @@ export function Navbar() {
         </div>
 
         {/* Auth */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           {authenticated ? (
             <>
               {addr && (
-                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/5 border border-white/[0.08] text-xs font-mono text-white/50">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_#34d399]" />
+                <div className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-[#F0EFEB] border border-[#E4E2DC] text-sm font-['DM_Mono'] text-[#1A1F2E]/50 min-h-[44px]">
+                  <span className="w-2 h-2 rounded-full bg-[#2D6A4F]" />
                   {shortenAddress(addr)}
                 </div>
               )}
               <button
                 onClick={() => logout()}
-                className="p-2 rounded-lg text-white/40 hover:text-white/70 hover:bg-white/5 transition-all"
+                className="p-3 rounded-xl text-[#1A1F2E]/40 hover:text-[#1A1F2E]/70 hover:bg-[#1A1F2E]/[0.04] transition-all duration-150 min-w-[44px] min-h-[44px] flex items-center justify-center"
               >
-                <LogOut size={15} />
+                <LogOut size={18} />
               </button>
             </>
           ) : (
             <button
               onClick={() => login()}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-violet-600 to-indigo-600 text-white text-sm font-semibold shadow-lg shadow-violet-500/25 hover:shadow-violet-500/40 hover:brightness-110 transition-all duration-200"
+              className="flex items-center gap-2 px-6 py-3 rounded-xl bg-[#2D6A4F] text-white text-base font-semibold hover:bg-[#245A42] hover:-translate-y-[1px] transition-all duration-150 min-h-[48px]"
             >
-              <Wallet size={14} />
+              <Wallet size={18} />
               Connect
             </button>
           )}

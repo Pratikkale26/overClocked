@@ -10,7 +10,7 @@ import { createSolanaRpc, createSolanaRpcSubscriptions } from '@solana/kit';
 
 const RPC =
   process.env.NEXT_PUBLIC_SOLANA_RPC ?? "https://api.devnet.solana.com";
-  const DEVNET_WSS_URL = RPC.replace('https://', 'wss://');
+const DEVNET_WSS_URL = RPC.replace('https://', 'wss://');
 
 
 const PRIVY_APP_ID = process.env.NEXT_PUBLIC_PRIVY_APP_ID ?? "";
@@ -72,8 +72,8 @@ export function Providers({ children }: { children: ReactNode }) {
       config={{
         loginMethods: ["twitter", "wallet", "google"],
         appearance: {
-          theme: "dark",
-          accentColor: "#7c3aed",
+          theme: "light",
+          accentColor: "#2D6A4F",
           walletChainType: "solana-only",
           landingHeader: "Welcome to Credence",
           loginMessage: "Transparent crowdfunding on Solana.",
@@ -88,19 +88,19 @@ export function Providers({ children }: { children: ReactNode }) {
         },
 
         solana: {
-                    rpcs: {
-                        'solana:devnet': {
-                            rpc: createSolanaRpc(RPC),
-                            rpcSubscriptions: createSolanaRpcSubscriptions(DEVNET_WSS_URL),
-                            blockExplorerUrl: 'https://solscan.io/?cluster=devnet',
-                        },
-                        'solana:mainnet': {
-                            rpc: createSolanaRpc('https://api.mainnet-beta.solana.com'),
-                            rpcSubscriptions: createSolanaRpcSubscriptions('wss://api.mainnet-beta.solana.com'),
-                            blockExplorerUrl: 'https://solscan.io',
-                        },
-                    },
-                  }
+          rpcs: {
+            'solana:devnet': {
+              rpc: createSolanaRpc(RPC),
+              rpcSubscriptions: createSolanaRpcSubscriptions(DEVNET_WSS_URL),
+              blockExplorerUrl: 'https://solscan.io/?cluster=devnet',
+            },
+            'solana:mainnet': {
+              rpc: createSolanaRpc('https://api.mainnet-beta.solana.com'),
+              rpcSubscriptions: createSolanaRpcSubscriptions('wss://api.mainnet-beta.solana.com'),
+              blockExplorerUrl: 'https://solscan.io',
+            },
+          },
+        }
       }}
     >
       <WalletProviders>{children}</WalletProviders>

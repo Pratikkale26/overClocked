@@ -17,101 +17,100 @@ export default function AuditPage({ params }: { params: Promise<{ id: string }> 
     }, [id]);
 
     const stateClasses: Record<string, string> = {
-        PENDING: "bg-white/5 text-white/30 border-white/10",
-        UNDER_REVIEW: "bg-amber-500/10 text-amber-400 border-amber-500/20",
-        APPROVED: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
-        REJECTED: "bg-red-500/10 text-red-400 border-red-500/20",
+        PENDING: "bg-[#F0EFEB] text-[#1A1F2E]/35 border-[#E4E2DC]",
+        UNDER_REVIEW: "bg-[#C2850C]/10 text-[#C2850C] border-[#C2850C]/20",
+        APPROVED: "bg-[#2D6A4F]/10 text-[#2D6A4F] border-[#2D6A4F]/20",
+        REJECTED: "bg-[#C44536]/10 text-[#C44536] border-[#C44536]/20",
     };
 
     return (
-        <div className="min-h-screen bg-[#050509] text-white font-['Inter']">
+        <div className="min-h-screen bg-[#F8F7F4] text-[#1A1F2E]">
             <Navbar />
-            <main className="mx-auto max-w-[800px] px-6 pt-10 pb-16">
+            <main className="mx-auto max-w-[800px] px-8 pt-12 pb-24">
                 <Link href={`/campaign/${id}`}>
-                    <button className="flex items-center gap-1.5 text-sm text-white/40 hover:text-white/70 transition-colors mb-6">
-                        <ArrowLeft size={14} /> Back to Campaign
+                    <button className="flex items-center gap-2 text-base text-[#1A1F2E]/40 hover:text-[#1A1F2E]/70 transition-colors duration-150 mb-8 min-h-[44px]">
+                        <ArrowLeft size={16} /> Back to Campaign
                     </button>
                 </Link>
 
-                <h1 className="text-2xl font-black tracking-tight mb-2">🔗 Proof-of-History Audit</h1>
-                <p className="text-sm text-white/40 leading-relaxed mb-8 max-w-lg">
+                <h1 className="text-4xl font-bold tracking-[-0.03em] mb-3">Proof-of-History Audit</h1>
+                <p className="text-lg text-[#1A1F2E]/40 leading-relaxed mb-12 max-w-lg">
                     Every phase proof is hash-linked to the previous one — forming a tamper-evident chain.
                 </p>
 
                 {loading ? (
-                    <div className="space-y-4">{[1, 2, 3].map((i) => <div key={i} className="skeleton h-36 rounded-2xl" />)}</div>
+                    <div className="space-y-6">{[1, 2, 3].map((i) => <div key={i} className="skeleton h-44 rounded-xl" />)}</div>
                 ) : chain.length === 0 ? (
-                    <div className="text-center py-16 text-white/30">
-                        <div className="text-5xl mb-3">🔗</div>
-                        <p>No proofs submitted yet.</p>
+                    <div className="text-center py-24 text-[#1A1F2E]/30">
+                        <div className="text-6xl mb-4">🔗</div>
+                        <p className="text-lg">No proofs submitted yet.</p>
                     </div>
                 ) : (
-                    <div className="space-y-5">
+                    <div className="space-y-6">
                         {chain.map((phase, idx) => (
-                            <div key={phase.id} className="bg-[#0f0f1a] border border-white/[0.06] rounded-2xl p-6 relative overflow-hidden">
-                                <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-violet-600/30 to-transparent" />
+                            <div key={phase.id} className="bg-white border border-[#E4E2DC] rounded-xl p-8 shadow-[0_4px_12px_rgba(26,31,46,0.06)]">
 
-                                <div className="flex justify-between items-start mb-5">
+                                <div className="flex justify-between items-start mb-6">
                                     <div>
-                                        <p className="text-[10px] font-bold text-violet-400 uppercase tracking-widest mb-1">Phase {phase.index + 1}</p>
-                                        <h3 className="font-bold text-base">{phase.title}</h3>
+                                        <p className="text-sm font-bold text-[#2D6A4F] uppercase tracking-widest mb-2">Phase {phase.index + 1}</p>
+                                        <h3 className="font-bold text-xl">{phase.title}</h3>
                                     </div>
-                                    <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border ${stateClasses[phase.state] ?? ""}`}>
+                                    <span className={`text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded-lg border ${stateClasses[phase.state] ?? ""}`}>
                                         {phase.state.replace("_", " ")}
                                     </span>
                                 </div>
 
                                 {phase.proof ? (
-                                    <div className="mb-4">
-                                        <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-4 space-y-2.5">
-                                            <p className="text-xs font-bold text-white/40">📄 Invoice Proof</p>
+                                    <div className="mb-6">
+                                        <div className="bg-[#F8F7F4] border border-[#E4E2DC] rounded-xl p-6 space-y-3">
+                                            <p className="text-sm font-bold text-[#1A1F2E]/45">Invoice Proof</p>
 
                                             <div className="flex items-center gap-2">
                                                 {phase.proof.gstinVerified
-                                                    ? <Shield size={13} className="text-emerald-400" />
-                                                    : <AlertCircle size={13} className="text-amber-400" />}
-                                                <span className="text-sm">
+                                                    ? <Shield size={16} className="text-[#2D6A4F]" />
+                                                    : <AlertCircle size={16} className="text-[#C2850C]" />}
+                                                <span className="text-base">
                                                     {phase.proof.isUnregisteredVendor
-                                                        ? <span className="text-amber-400">⚠️ Unregistered vendor</span>
+                                                        ? <span className="text-[#C2850C]">⚠️ Unregistered vendor</span>
                                                         : phase.proof.gstinVerified
-                                                            ? <><span className="text-emerald-400 font-semibold">{phase.proof.vendorLegalName}</span><code className="text-[10px] text-white/20 ml-2 bg-white/[0.03] px-1.5 py-0.5 rounded">{phase.proof.gstin}</code></>
-                                                            : <span className="text-white/30">GSTIN unverified</span>}
+                                                            ? <><span className="text-[#2D6A4F] font-semibold">{phase.proof.vendorLegalName}</span><code className="text-xs text-[#1A1F2E]/25 ml-2 bg-[#F0EFEB] px-2 py-1 rounded-lg font-['DM_Mono']">{phase.proof.gstin}</code></>
+                                                            : <span className="text-[#1A1F2E]/35">GSTIN unverified</span>}
                                                 </span>
                                             </div>
 
                                             {phase.proof.invoiceNumber && (
-                                                <p className="text-xs text-white/30">
+                                                <p className="text-sm text-[#1A1F2E]/35">
                                                     Invoice: {phase.proof.invoiceNumber}
                                                     {phase.proof.invoiceAmountPaise ? ` · ₹${(Number(phase.proof.invoiceAmountPaise) / 100).toLocaleString("en-IN")}` : ""}
                                                 </p>
                                             )}
 
-                                            <div className="space-y-1 mt-2.5">
-                                                <p className="text-[10px] font-mono text-white/15">
-                                                    <span className="text-white/30 mr-2">INVOICE HASH</span>{phase.proof.invoiceHash}
+                                            <div className="space-y-1.5 mt-3">
+                                                <p className="text-xs font-['DM_Mono'] text-[#1A1F2E]/20">
+                                                    <span className="text-[#1A1F2E]/35 mr-2">INVOICE HASH</span>{phase.proof.invoiceHash}
                                                 </p>
                                                 {idx > 0 && phase.proof.prevProofHash && (
-                                                    <p className="text-[10px] font-mono text-white/15">
-                                                        <span className="text-white/30 mr-2">PREV HASH</span>{phase.proof.prevProofHash}
+                                                    <p className="text-xs font-['DM_Mono'] text-[#1A1F2E]/20">
+                                                        <span className="text-[#1A1F2E]/35 mr-2">PREV HASH</span>{phase.proof.prevProofHash}
                                                     </p>
                                                 )}
-                                                <p className="text-[10px] text-white/15">
+                                                <p className="text-xs text-[#1A1F2E]/20">
                                                     Submitted: {new Date(phase.proof.submittedAt).toLocaleString("en-IN")}
                                                 </p>
                                             </div>
                                         </div>
 
                                         {idx < chain.length - 1 && (
-                                            <div className="text-center py-2 text-lg text-white/10">⬇</div>
+                                            <div className="text-center py-3 text-xl text-[#1A1F2E]/15">⬇</div>
                                         )}
                                     </div>
                                 ) : (
-                                    <p className="text-sm text-white/25 py-3">No proof submitted for this phase.</p>
+                                    <p className="text-base text-[#1A1F2E]/25 py-4">No proof submitted for this phase.</p>
                                 )}
 
                                 {phase.updates?.length > 0 && (
-                                    <div className="border-t border-white/[0.04] pt-4">
-                                        <p className="text-xs font-bold text-white/30 mb-4">Activity ({phase.updates.length})</p>
+                                    <div className="border-t border-[#E4E2DC] pt-6">
+                                        <p className="text-sm font-bold text-[#1A1F2E]/35 mb-6">Activity ({phase.updates.length})</p>
                                         <DprTimeline updates={phase.updates} title="" />
                                     </div>
                                 )}

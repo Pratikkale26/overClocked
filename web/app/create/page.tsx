@@ -56,15 +56,15 @@ function Field({
 }) {
   return (
     <div>
-      <label className="block text-xs font-semibold text-white/40 uppercase tracking-wider mb-2">{label}</label>
+      <label className="block text-sm font-semibold text-[#1A1F2E]/40 uppercase tracking-wider mb-2">{label}</label>
       {children}
-      {hint && <p className="text-[11px] text-white/20 mt-1.5">{hint}</p>}
+      {hint && <p className="text-sm text-[#1A1F2E]/25 mt-2">{hint}</p>}
     </div>
   );
 }
 
 const inputCls =
-  "w-full px-4 py-3 rounded-xl bg-[#161625] border border-white/[0.08] text-white text-sm placeholder-white/20 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500/30 transition-all";
+  "w-full px-4 py-3.5 rounded-xl bg-[#F8F7F4] border border-[#E4E2DC] text-[#1A1F2E] text-base placeholder-[#1A1F2E]/25 focus:outline-none focus:border-[#2D6A4F] focus:ring-1 focus:ring-[#2D6A4F]/20 transition-all duration-150 min-h-[48px]";
 const selectCls = `${inputCls} appearance-none`;
 
 export default function CreatePage() {
@@ -92,17 +92,17 @@ export default function CreatePage() {
 
   if (!authenticated) {
     return (
-      <div className="min-h-screen bg-[#050509] text-white font-['Inter']">
+      <div className="min-h-screen bg-[#F8F7F4] text-[#1A1F2E]">
         <Navbar />
-        <div className="mx-auto max-w-[1240px] px-6 pt-24 text-center">
-          <div className="text-5xl mb-4">🔐</div>
-          <h2 className="text-xl font-bold mb-3">Connect to get started</h2>
-          <p className="text-white/40 mb-6 text-sm">You need to log in to create a campaign.</p>
+        <div className="mx-auto max-w-[1200px] px-8 pt-32 text-center">
+          <div className="text-6xl mb-6">🔐</div>
+          <h2 className="text-2xl font-bold mb-4">Connect to get started</h2>
+          <p className="text-lg text-[#1A1F2E]/45 mb-8">You need to log in to create a campaign.</p>
           <button
             onClick={() => login()}
-            className="inline-flex items-center gap-2 px-6 py-3.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-semibold shadow-lg shadow-violet-500/20 hover:shadow-violet-500/35 hover:brightness-110 transition-all"
+            className="inline-flex items-center gap-2 px-8 py-4 rounded-xl bg-[#2D6A4F] text-white font-semibold text-lg hover:bg-[#245A42] hover:-translate-y-[1px] transition-all duration-150 min-h-[48px]"
           >
-            <Wallet size={16} /> Connect with Privy
+            <Wallet size={20} /> Connect with Privy
           </button>
         </div>
       </div>
@@ -130,8 +130,8 @@ export default function CreatePage() {
   );
   const linkedSolanaAddress =
     linkedSolanaAccount &&
-    "address" in linkedSolanaAccount &&
-    typeof linkedSolanaAccount.address === "string"
+      "address" in linkedSolanaAccount &&
+      typeof linkedSolanaAccount.address === "string"
       ? linkedSolanaAccount.address
       : undefined;
   const connectedWalletAddress = publicKey?.toBase58() ?? user?.wallet?.address ?? linkedSolanaAddress;
@@ -304,31 +304,29 @@ export default function CreatePage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#050509] text-white font-['Inter']">
+    <div className="min-h-screen bg-[#F8F7F4] text-[#1A1F2E]">
       <Navbar />
-      <div className="fixed top-0 left-1/2 -translate-x-1/2 w-[700px] h-[500px] bg-[radial-gradient(ellipse,rgba(124,58,237,0.05)_0%,transparent_70%)] pointer-events-none -z-10" />
 
-      <main className="mx-auto max-w-[680px] px-6 pt-10 pb-16">
-        <h1 className="text-3xl font-black tracking-tight bg-gradient-to-r from-violet-400 to-indigo-400 bg-clip-text text-transparent mb-2">
+      <main className="mx-auto max-w-[720px] px-8 pt-12 pb-24">
+        <h1 className="text-4xl font-bold tracking-[-0.03em] text-[#1A1F2E] mb-3">
           Start a Campaign
         </h1>
-        <p className="text-white/40 text-sm mb-8">Create an on-chain milestone-backed fundraiser.</p>
+        <p className="text-lg text-[#1A1F2E]/45 mb-12 leading-relaxed">Create an on-chain milestone-backed fundraiser.</p>
 
-        <div className="flex gap-2 mb-10">
+        <div className="flex gap-3 mb-12">
           {STEPS.map((s, i) => (
-            <div key={s} className="flex-1 flex flex-col items-center gap-2">
+            <div key={s} className="flex-1 flex flex-col items-center gap-3">
               <div
-                className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
-                  i < step
-                    ? "bg-emerald-500 text-white"
+                className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold transition-all duration-200 ${i < step
+                    ? "bg-[#2D6A4F] text-white"
                     : i === step
-                      ? "bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-lg shadow-violet-500/20"
-                      : "bg-[#161625] border border-white/[0.08] text-white/30"
-                }`}
+                      ? "bg-[#2D6A4F] text-white shadow-[0_4px_12px_rgba(45,106,79,0.2)]"
+                      : "bg-[#F0EFEB] border border-[#E4E2DC] text-[#1A1F2E]/30"
+                  }`}
               >
                 {i < step ? "✓" : i + 1}
               </div>
-              <span className={`text-[10px] font-semibold text-center ${i === step ? "text-violet-400" : "text-white/20"}`}>
+              <span className={`text-xs font-semibold text-center ${i === step ? "text-[#2D6A4F]" : "text-[#1A1F2E]/25"}`}>
                 {s}
               </span>
             </div>
@@ -336,10 +334,9 @@ export default function CreatePage() {
         </div>
 
         {step === 0 && (
-          <div className="bg-[#0f0f1a] border border-white/[0.06] rounded-2xl p-7 relative overflow-hidden">
-            <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-violet-600/40 to-transparent" />
-            <h2 className="text-base font-bold mb-6">Organisation Details</h2>
-            <div className="space-y-4">
+          <div className="bg-white border border-[#E4E2DC] rounded-xl p-8 shadow-[0_4px_12px_rgba(26,31,46,0.06)]">
+            <h2 className="text-xl font-bold mb-8">Organisation Details</h2>
+            <div className="space-y-6">
               <Field label="Organisation Name *">
                 <input className={inputCls} placeholder="e.g. Shaastra, IIT Madras" value={orgName} onChange={(e) => setOrgName(e.target.value)} />
               </Field>
@@ -354,23 +351,23 @@ export default function CreatePage() {
               </Field>
               <Field label="X (Twitter) Account">
                 {twitterHandle ? (
-                  <div className="px-4 py-3 rounded-xl bg-emerald-500/10 border border-emerald-400/20 text-emerald-300 text-sm">
+                  <div className="px-4 py-3.5 rounded-xl bg-[#2D6A4F]/8 border border-[#2D6A4F]/20 text-[#2D6A4F] text-base font-medium min-h-[48px] flex items-center">
                     Linked as @{twitterHandle}
                   </div>
                 ) : (
                   <button
                     type="button"
                     onClick={handleLinkTwitter}
-                    className="w-full px-4 py-3 rounded-xl bg-[#161625] border border-white/[0.08] text-white/80 text-sm font-semibold hover:border-violet-500/50 transition-all"
+                    className="w-full px-4 py-3.5 rounded-xl bg-[#F8F7F4] border border-[#E4E2DC] text-[#1A1F2E]/80 text-base font-semibold hover:border-[#2D6A4F]/50 transition-all duration-150 min-h-[48px]"
                   >
                     Connect X via Privy
                   </button>
                 )}
               </Field>
               <Field label="Organisation GSTIN *" hint="15-char format: 29AABCR1234A1Z5. Any valid format works in demo mode.">
-                <div className="flex gap-2">
+                <div className="flex gap-3">
                   <input
-                    className={`${inputCls} font-mono flex-1`}
+                    className={`${inputCls} font-['DM_Mono'] flex-1`}
                     placeholder="e.g. 29AABCR1234A1Z5"
                     value={orgGstin}
                     onChange={(e) => setOrgGstin(e.target.value)}
@@ -378,7 +375,7 @@ export default function CreatePage() {
                   <button
                     type="button"
                     onClick={() => setOrgGstin("29AABCR1234A1Z5")}
-                    className="px-3 py-2 rounded-xl bg-violet-500/10 border border-violet-500/20 text-violet-400 text-xs font-bold hover:bg-violet-500/20 transition-all whitespace-nowrap shrink-0"
+                    className="px-4 py-3 rounded-xl bg-[#2D6A4F]/8 border border-[#2D6A4F]/20 text-[#2D6A4F] text-sm font-bold hover:bg-[#2D6A4F]/15 transition-all duration-150 whitespace-nowrap shrink-0 min-h-[48px]"
                   >
                     Use Demo
                   </button>
@@ -386,7 +383,7 @@ export default function CreatePage() {
               </Field>
               <Field label="Description">
                 <textarea
-                  className={`${inputCls} min-h-[80px] resize-y`}
+                  className={`${inputCls} min-h-[100px] resize-y`}
                   placeholder="What does your organisation do?"
                   value={orgDescription}
                   onChange={(e) => setOrgDescription(e.target.value)}
@@ -396,30 +393,29 @@ export default function CreatePage() {
             <button
               disabled={!orgName || !orgGstin.trim()}
               onClick={() => setStep(1)}
-              className="w-full mt-7 py-3.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-semibold flex items-center justify-center gap-2 shadow-lg shadow-violet-500/20 hover:shadow-violet-500/35 hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+              className="w-full mt-8 py-4 rounded-xl bg-[#2D6A4F] text-white font-semibold text-base flex items-center justify-center gap-2 hover:bg-[#245A42] hover:-translate-y-[1px] disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-150 min-h-[48px]"
             >
-              Next: Campaign Info <ArrowRight size={15} />
+              Next: Campaign Info <ArrowRight size={18} />
             </button>
           </div>
         )}
 
         {step === 1 && (
-          <div className="bg-[#0f0f1a] border border-white/[0.06] rounded-2xl p-7 relative overflow-hidden">
-            <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-violet-600/40 to-transparent" />
-            <h2 className="text-base font-bold mb-6">Campaign Details</h2>
-            <div className="space-y-4">
+          <div className="bg-white border border-[#E4E2DC] rounded-xl p-8 shadow-[0_4px_12px_rgba(26,31,46,0.06)]">
+            <h2 className="text-xl font-bold mb-8">Campaign Details</h2>
+            <div className="space-y-6">
               <Field label="Campaign Title *">
                 <input className={inputCls} placeholder="e.g. Shaastra 2025 Technical Festival" value={title} onChange={(e) => setTitle(e.target.value)} />
               </Field>
               <Field label="Description *">
                 <textarea
-                  className={`${inputCls} min-h-[120px] resize-y`}
+                  className={`${inputCls} min-h-[140px] resize-y`}
                   placeholder="Tell donors what you're raising for..."
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                 />
               </Field>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-4">
                 <Field label="Goal (SOL) *">
                   <input className={inputCls} type="number" min="0" step="0.1" placeholder="e.g. 40" value={goalSol} onChange={(e) => setGoalSol(e.target.value)} />
                 </Field>
@@ -437,19 +433,19 @@ export default function CreatePage() {
                 <input className={inputCls} placeholder="education, tech, open-source" value={tags} onChange={(e) => setTags(e.target.value)} />
               </Field>
             </div>
-            <div className="flex gap-3 mt-7">
+            <div className="flex gap-4 mt-8">
               <button
                 onClick={() => setStep(0)}
-                className="px-5 py-3 rounded-xl border border-white/[0.08] text-white/50 text-sm font-semibold hover:bg-white/5 transition-all flex items-center gap-1.5"
+                className="px-6 py-3.5 rounded-xl border border-[#E4E2DC] text-[#1A1F2E]/50 text-base font-semibold hover:bg-[#F0EFEB] transition-all duration-150 flex items-center gap-2 min-h-[48px]"
               >
-                <ArrowLeft size={15} /> Back
+                <ArrowLeft size={18} /> Back
               </button>
               <button
                 disabled={!title || !description || !goalSol}
                 onClick={() => setStep(2)}
-                className="flex-1 py-3.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-semibold flex items-center justify-center gap-2 shadow-lg shadow-violet-500/20 hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                className="flex-1 py-3.5 rounded-xl bg-[#2D6A4F] text-white font-semibold text-base flex items-center justify-center gap-2 hover:bg-[#245A42] disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-150 min-h-[48px]"
               >
-                Next: Milestones <ArrowRight size={15} />
+                Next: Milestones <ArrowRight size={18} />
               </button>
             </div>
           </div>
@@ -457,29 +453,28 @@ export default function CreatePage() {
 
         {step === 2 && (
           <div>
-            <div className="flex items-start gap-2.5 p-4 rounded-xl bg-violet-500/[0.06] border border-violet-500/20 mb-5 text-sm text-white/50">
-              <Info size={15} className="text-violet-400 shrink-0 mt-0.5" />
+            <div className="flex items-start gap-3 p-6 rounded-xl bg-[#2D6A4F]/[0.06] border border-[#2D6A4F]/20 mb-6 text-base text-[#1A1F2E]/55">
+              <Info size={18} className="text-[#2D6A4F] shrink-0 mt-0.5" />
               Milestone amounts must sum to {goalSol || 0} SOL. Current: {totalMilestoneSol.toFixed(2)} SOL.
             </div>
-            <div className="space-y-4">
+            <div className="space-y-6">
               {milestones.map((m, i) => (
-                <div key={i} className="bg-[#0f0f1a] border border-white/[0.06] rounded-2xl p-5 relative overflow-hidden">
-                  <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-violet-600/30 to-transparent" />
-                  <div className="flex justify-between items-center mb-4">
-                    <span className="text-xs font-bold text-violet-400">Milestone {i + 1}</span>
+                <div key={i} className="bg-white border border-[#E4E2DC] rounded-xl p-6 shadow-[0_4px_12px_rgba(26,31,46,0.06)]">
+                  <div className="flex justify-between items-center mb-6">
+                    <span className="text-sm font-bold text-[#2D6A4F]">Milestone {i + 1}</span>
                     {milestones.length > 1 && (
                       <button
                         onClick={() => removeMilestone(i)}
-                        className="p-1.5 rounded-lg text-red-400/60 hover:bg-red-500/10 hover:text-red-400 transition-all"
+                        className="p-2.5 rounded-lg text-[#C44536]/60 hover:bg-[#C44536]/10 hover:text-[#C44536] transition-all duration-150 min-w-[44px] min-h-[44px] flex items-center justify-center"
                       >
-                        <Trash2 size={13} />
+                        <Trash2 size={16} />
                       </button>
                     )}
                   </div>
-                  <div className="space-y-3">
+                  <div className="space-y-4">
                     <input className={inputCls} placeholder="Milestone title" value={m.title} onChange={(e) => updateMilestone(i, "title", e.target.value)} />
                     <textarea
-                      className={`${inputCls} min-h-[70px] resize-y`}
+                      className={`${inputCls} min-h-[80px] resize-y`}
                       placeholder="What needs to happen?"
                       value={m.description}
                       onChange={(e) => updateMilestone(i, "description", e.target.value)}
@@ -498,34 +493,33 @@ export default function CreatePage() {
               ))}
               <button
                 onClick={addMilestone}
-                className="w-full py-3 rounded-xl border border-dashed border-white/[0.08] text-white/30 text-sm font-semibold hover:bg-white/[0.03] hover:text-white/50 transition-all flex items-center justify-center gap-2"
+                className="w-full py-4 rounded-xl border border-dashed border-[#E4E2DC] text-[#1A1F2E]/30 text-base font-semibold hover:bg-[#F0EFEB] hover:text-[#1A1F2E]/50 transition-all duration-150 flex items-center justify-center gap-2 min-h-[48px]"
               >
-                <Plus size={15} /> Add Milestone
+                <Plus size={18} /> Add Milestone
               </button>
             </div>
-            <div className="flex gap-3 mt-7">
+            <div className="flex gap-4 mt-8">
               <button
                 onClick={() => setStep(1)}
-                className="px-5 py-3 rounded-xl border border-white/[0.08] text-white/50 text-sm font-semibold hover:bg-white/5 transition-all flex items-center gap-1.5"
+                className="px-6 py-3.5 rounded-xl border border-[#E4E2DC] text-[#1A1F2E]/50 text-base font-semibold hover:bg-[#F0EFEB] transition-all duration-150 flex items-center gap-2 min-h-[48px]"
               >
-                <ArrowLeft size={15} /> Back
+                <ArrowLeft size={18} /> Back
               </button>
               <button
                 disabled={!milestonesValid || milestones.some((m) => !m.title.trim())}
                 onClick={() => setStep(3)}
-                className="flex-1 py-3.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-semibold flex items-center justify-center gap-2 shadow-lg shadow-violet-500/20 hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                className="flex-1 py-3.5 rounded-xl bg-[#2D6A4F] text-white font-semibold text-base flex items-center justify-center gap-2 hover:bg-[#245A42] disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-150 min-h-[48px]"
               >
-                Review & Launch <ArrowRight size={15} />
+                Review & Launch <ArrowRight size={18} />
               </button>
             </div>
           </div>
         )}
 
         {step === 3 && (
-          <div className="bg-[#0f0f1a] border border-white/[0.06] rounded-2xl p-7 relative overflow-hidden">
-            <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-violet-600/40 to-transparent" />
-            <h2 className="text-base font-bold mb-6">Review & Launch</h2>
-            <div className="space-y-3 mb-6">
+          <div className="bg-white border border-[#E4E2DC] rounded-xl p-8 shadow-[0_4px_12px_rgba(26,31,46,0.06)]">
+            <h2 className="text-xl font-bold mb-8">Review & Launch</h2>
+            <div className="space-y-4 mb-8">
               {[
                 { label: "Org", value: `${orgName} (${ORG_CATEGORY_LABELS[orgCategory]})` },
                 { label: "Campaign", value: title },
@@ -533,26 +527,26 @@ export default function CreatePage() {
                 { label: "Yield", value: YIELD_LABELS[yieldPolicy] },
                 { label: "Milestones", value: `${milestones.length} phase(s)` },
               ].map(({ label, value }) => (
-                <div key={label} className="flex justify-between items-center py-2.5 border-b border-white/[0.04]">
-                  <span className="text-xs text-white/30">{label}</span>
-                  <span className="text-sm font-semibold text-right max-w-[60%]">{value}</span>
+                <div key={label} className="flex justify-between items-center py-4 border-b border-[#E4E2DC]">
+                  <span className="text-sm text-[#1A1F2E]/35">{label}</span>
+                  <span className="text-base font-semibold text-right max-w-[60%]">{value}</span>
                 </div>
               ))}
             </div>
-            <div className="flex items-start gap-2.5 p-4 rounded-xl bg-amber-500/[0.05] border border-amber-500/20 mb-6 text-xs text-white/40">
+            <div className="flex items-start gap-3 p-6 rounded-xl bg-[#C2850C]/[0.06] border border-[#C2850C]/20 mb-8 text-sm text-[#1A1F2E]/50">
               ⚠️ After creating the campaign metadata, you&apos;ll sign a transaction to activate the on-chain escrow vault.
             </div>
-            <div className="flex gap-3">
+            <div className="flex gap-4">
               <button
                 onClick={() => setStep(2)}
-                className="px-5 py-3 rounded-xl border border-white/[0.08] text-white/50 text-sm font-semibold hover:bg-white/5 transition-all flex items-center gap-1.5"
+                className="px-6 py-3.5 rounded-xl border border-[#E4E2DC] text-[#1A1F2E]/50 text-base font-semibold hover:bg-[#F0EFEB] transition-all duration-150 flex items-center gap-2 min-h-[48px]"
               >
-                <ArrowLeft size={15} /> Back
+                <ArrowLeft size={18} /> Back
               </button>
               <button
                 onClick={handleSubmit}
                 disabled={loading || gstinChecking}
-                className="flex-1 py-3.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-bold flex items-center justify-center gap-2 shadow-lg shadow-violet-500/20 hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                className="flex-1 py-4 rounded-xl bg-[#2D6A4F] text-white font-bold text-base flex items-center justify-center gap-2 hover:bg-[#245A42] disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-150 min-h-[48px]"
               >
                 {loading || gstinChecking ? "Creating..." : "Launch Campaign"}
               </button>

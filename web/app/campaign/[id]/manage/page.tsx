@@ -29,7 +29,7 @@ import {
 
 const UPDATE_TYPES = ["PROGRESS", "EXPENSE", "PHOTO", "COMPLETION", "ANNOUNCEMENT"];
 
-const inputCls = "w-full px-4 py-3 rounded-xl bg-[#161625] border border-white/[0.08] text-white text-sm placeholder-white/20 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500/30 transition-all";
+const inputCls = "w-full px-4 py-3.5 rounded-xl bg-[#F8F7F4] border border-[#E4E2DC] text-[#1A1F2E] text-base placeholder-[#1A1F2E]/25 focus:outline-none focus:border-[#2D6A4F] focus:ring-1 focus:ring-[#2D6A4F]/20 transition-all duration-150 min-h-[48px]";
 
 async function sha256Bytes(input: string): Promise<number[]> {
     const encoded = new TextEncoder().encode(input);
@@ -80,16 +80,9 @@ export default function ManageCampaignPage({ params }: { params: Promise<{ id: s
     useEffect(() => { load(); }, [load]);
 
     useEffect(() => {
-        if (!activeMilestone) {
-            setUpdates([]);
-            setProof(null);
-            return;
-        }
+        if (!activeMilestone) { setUpdates([]); setProof(null); return; }
         (async () => {
-            const [u, p] = await Promise.allSettled([
-                fetchMilestoneUpdates(activeMilestone.id),
-                fetchMilestoneProof(activeMilestone.id),
-            ]);
+            const [u, p] = await Promise.allSettled([fetchMilestoneUpdates(activeMilestone.id), fetchMilestoneProof(activeMilestone.id)]);
             setUpdates(u.status === "fulfilled" ? u.value : []);
             setProof(p.status === "fulfilled" ? p.value : null);
         })();
@@ -102,168 +95,60 @@ export default function ManageCampaignPage({ params }: { params: Promise<{ id: s
         if (!isUnregistered && !gstin) { toast.error("Enter vendor GSTIN or mark as unregistered"); return; }
         if (!invoiceFile) { toast.error("Upload the invoice first"); return; }
         const signerAddr = publicKey?.toBase58() ?? linkedAddr ?? user?.wallet?.address;
-        if (!signerAddr) {
-            toast.error("Connect your creator wallet first");
-            return;
-        }
-        if (!currentCampaign.onchainProjectPda && !(currentCampaign.projectIdBytes && currentCampaign.org?.walletAddress)) {
-            toast.error("Campaign is missing on-chain project reference");
-            return;
-        }
+        if (!signerAddr) { toast.error("Connect your creator wallet first"); return; }
+        if (!currentCampaign.onchainProjectPda && !(currentCampaign.projectIdBytes && currentCampaign.org?.walletAddress)) { toast.error("Campaign is missing on-chain project reference"); return; }
         setProofLoading(true);
         try {
             const { uploadUrl, s3Key } = await presignProofUpload(activeMilestone.id, invoiceFile.name, invoiceFile.type);
-            const putRes = await fetch(uploadUrl, {
-                method: "PUT",
-                body: invoiceFile,
-                headers: { "Content-Type": invoiceFile.type },
-            });
-            if (!putRes.ok) {
-                const detail = await putRes.text().catch(() => "");
-                throw new Error(`File upload failed (${putRes.status})${detail ? `: ${detail}` : ""}`);
-            }
+            const putRes = await fetch(uploadUrl, { method: "PUT", body: invoiceFile, headers: { "Content-Type": invoiceFile.type } });
+            if (!putRes.ok) { const detail = await putRes.text().catch(() => ""); throw new Error(`File upload failed (${putRes.status})${detail ? `: ${detail}` : ""}`); }
             const proofResult = await submitMilestoneProof(activeMilestone.id, {
-                gstin: isUnregistered ? undefined : gstin.toUpperCase().trim(),
-                isUnregisteredVendor: isUnregistered, invoiceS3Key: s3Key,
-                invoiceNumber: invoiceNumber || undefined,
-                invoiceAmountPaise: invoiceAmount ? Math.round(parseFloat(invoiceAmount) * 100) : undefined,
+                gstin: isUnregistered ? undefined : gstin.toUpperCase().trim(), isUnregisteredVendor: isUnregistered, invoiceS3Key: s3Key,
+                invoiceNumber: invoiceNumber || undefined, invoiceAmountPaise: invoiceAmount ? Math.round(parseFloat(invoiceAmount) * 100) : undefined,
                 votingWindowSecs: votingHours * 3600,
             });
             const projectPda = currentCampaign.onchainProjectPda
                 ? new PublicKey(currentCampaign.onchainProjectPda)
-                : (() => {
-                    const [pda] = deriveProjectPDA(
-                        new PublicKey(currentCampaign.org.walletAddress!),
-                        hexToProjectId(currentCampaign.projectIdBytes!)
-                    );
-                    return pda;
-                })();
+                : (() => { const [pda] = deriveProjectPDA(new PublicKey(currentCampaign.org.walletAddress!), hexToProjectId(currentCampaign.projectIdBytes!)); return pda; })();
             const creatorPk = new PublicKey(signerAddr);
             const provider = new AnchorProvider(connection, {} as never, { commitment: "confirmed" });
-            const orgGstinHashBytes = isUnregistered
-                ? new Array(32).fill(0)
-                : currentCampaign.org.gstin
-                    ? await sha256Bytes(currentCampaign.org.gstin.trim().toUpperCase())
-                    : (() => { throw new Error("Org GSTIN missing for on-chain proof submission"); })();
-            const tx = await buildSubmitMilestoneProofTx(
-                getProgram(provider),
-                creatorPk,
-                projectPda,
-                activeMilestone.index,
-                s3Key,
-                String((proofResult as { invoiceHash: string }).invoiceHash),
-                orgGstinHashBytes,
-                Number((proofResult as { votingWindowSecs: number }).votingWindowSecs ?? votingHours * 3600)
-            );
+            const orgGstinHashBytes = isUnregistered ? new Array(32).fill(0) : currentCampaign.org.gstin ? await sha256Bytes(currentCampaign.org.gstin.trim().toUpperCase()) : (() => { throw new Error("Org GSTIN missing"); })();
+            const tx = await buildSubmitMilestoneProofTx(getProgram(provider), creatorPk, projectPda, activeMilestone.index, s3Key, String((proofResult as { invoiceHash: string }).invoiceHash), orgGstinHashBytes, Number((proofResult as { votingWindowSecs: number }).votingWindowSecs ?? votingHours * 3600));
             const { blockhash } = await connection.getLatestBlockhash("confirmed");
-            tx.feePayer = creatorPk;
-            tx.recentBlockhash = blockhash;
-
+            tx.feePayer = creatorPk; tx.recentBlockhash = blockhash;
             let proofSig: string | undefined;
-            if (publicKey && publicKey.toBase58() === signerAddr) {
-                proofSig = await sendWalletAdapterTransaction(tx, connection);
-            } else {
-                const stdWallet = connectedStandardWallets.find(
-                    (wallet) => wallet.address.toLowerCase() === signerAddr.toLowerCase()
-                );
-                if (stdWallet) {
-                    await signAndSendTransaction({
-                        transaction: tx.serialize({ requireAllSignatures: false, verifySignatures: false }),
-                        wallet: stdWallet,
-                        chain: "solana:devnet",
-                    });
-                } else {
-                    const receipt = await sendPrivyTransaction({ transaction: tx, connection, address: signerAddr });
-                    proofSig = receipt.signature;
-                }
-            }
+            if (publicKey && publicKey.toBase58() === signerAddr) { proofSig = await sendWalletAdapterTransaction(tx, connection); }
+            else { const stdWallet = connectedStandardWallets.find((w) => w.address.toLowerCase() === signerAddr.toLowerCase()); if (stdWallet) { await signAndSendTransaction({ transaction: tx.serialize({ requireAllSignatures: false, verifySignatures: false }), wallet: stdWallet, chain: "solana:devnet" }); } else { const receipt = await sendPrivyTransaction({ transaction: tx, connection, address: signerAddr }); proofSig = receipt.signature; } }
             await confirmMilestoneProofOnchain(activeMilestone.id, { onchainProofUri: s3Key, txSignature: proofSig });
             toast.success("Proof submitted!", { description: `Voting open for ${votingHours}h.` });
-            await load();
-            setProof(await fetchMilestoneProof(activeMilestone.id));
-        } catch (e: unknown) {
-            toast.error("Proof submission failed", { description: e instanceof Error ? e.message : "Error" });
-        } finally { setProofLoading(false); }
+            await load(); setProof(await fetchMilestoneProof(activeMilestone.id));
+        } catch (e: unknown) { toast.error("Proof submission failed", { description: e instanceof Error ? e.message : "Error" }); } finally { setProofLoading(false); }
     };
 
     const handleRetryOnchainProof = async () => {
         if (!activeMilestone || !proof) return;
-        const currentCampaign = campaign;
-        if (!currentCampaign) return;
+        const currentCampaign = campaign; if (!currentCampaign) return;
         const proofUri = proof.invoiceS3Key ?? activeMilestone.proofUri;
-        if (!proofUri || !proof.invoiceHash) {
-            toast.error("Missing proof data", { description: "Invoice key or hash not found. Re-upload proof." });
-            return;
-        }
+        if (!proofUri || !proof.invoiceHash) { toast.error("Missing proof data"); return; }
         const signerAddr = publicKey?.toBase58() ?? linkedAddr ?? user?.wallet?.address;
-        if (!signerAddr) {
-            toast.error("Connect your creator wallet first");
-            return;
-        }
-        if (!currentCampaign.onchainProjectPda && !(currentCampaign.projectIdBytes && currentCampaign.org?.walletAddress)) {
-            toast.error("Campaign is missing on-chain project reference");
-            return;
-        }
-
+        if (!signerAddr) { toast.error("Connect your creator wallet first"); return; }
+        if (!currentCampaign.onchainProjectPda && !(currentCampaign.projectIdBytes && currentCampaign.org?.walletAddress)) { toast.error("Campaign is missing on-chain project reference"); return; }
         setProofSyncLoading(true);
         try {
-            const orgGstinHashBytes = proof.isUnregisteredVendor
-                ? new Array(32).fill(0)
-                : currentCampaign.org.gstin
-                    ? await sha256Bytes(currentCampaign.org.gstin.trim().toUpperCase())
-                    : (() => { throw new Error("Org GSTIN missing for on-chain proof submission"); })();
+            const orgGstinHashBytes = proof.isUnregisteredVendor ? new Array(32).fill(0) : currentCampaign.org.gstin ? await sha256Bytes(currentCampaign.org.gstin.trim().toUpperCase()) : (() => { throw new Error("Org GSTIN missing"); })();
             const projectPda = currentCampaign.onchainProjectPda
                 ? new PublicKey(currentCampaign.onchainProjectPda)
-                : (() => {
-                    const [pda] = deriveProjectPDA(
-                        new PublicKey(currentCampaign.org.walletAddress!),
-                        hexToProjectId(currentCampaign.projectIdBytes!)
-                    );
-                    return pda;
-                })();
+                : (() => { const [pda] = deriveProjectPDA(new PublicKey(currentCampaign.org.walletAddress!), hexToProjectId(currentCampaign.projectIdBytes!)); return pda; })();
             const creatorPk = new PublicKey(signerAddr);
             const provider = new AnchorProvider(connection, {} as never, { commitment: "confirmed" });
-            const tx = await buildSubmitMilestoneProofTx(
-                getProgram(provider),
-                creatorPk,
-                projectPda,
-                activeMilestone.index,
-                proofUri,
-                proof.invoiceHash,
-                orgGstinHashBytes,
-                activeMilestone.votingWindowSecs
-            );
-            const { blockhash } = await connection.getLatestBlockhash("confirmed");
-            tx.feePayer = creatorPk;
-            tx.recentBlockhash = blockhash;
-
+            const tx = await buildSubmitMilestoneProofTx(getProgram(provider), creatorPk, projectPda, activeMilestone.index, proofUri, proof.invoiceHash, orgGstinHashBytes, activeMilestone.votingWindowSecs);
+            const { blockhash } = await connection.getLatestBlockhash("confirmed"); tx.feePayer = creatorPk; tx.recentBlockhash = blockhash;
             let proofSig: string | undefined;
-            if (publicKey && publicKey.toBase58() === signerAddr) {
-                proofSig = await sendWalletAdapterTransaction(tx, connection);
-            } else {
-                const stdWallet = connectedStandardWallets.find(
-                    (wallet) => wallet.address.toLowerCase() === signerAddr.toLowerCase()
-                );
-                if (stdWallet) {
-                    await signAndSendTransaction({
-                        transaction: tx.serialize({ requireAllSignatures: false, verifySignatures: false }),
-                        wallet: stdWallet,
-                        chain: "solana:devnet",
-                    });
-                } else {
-                    const receipt = await sendPrivyTransaction({ transaction: tx, connection, address: signerAddr });
-                    proofSig = receipt.signature;
-                }
-            }
+            if (publicKey && publicKey.toBase58() === signerAddr) { proofSig = await sendWalletAdapterTransaction(tx, connection); }
+            else { const stdWallet = connectedStandardWallets.find((w) => w.address.toLowerCase() === signerAddr.toLowerCase()); if (stdWallet) { await signAndSendTransaction({ transaction: tx.serialize({ requireAllSignatures: false, verifySignatures: false }), wallet: stdWallet, chain: "solana:devnet" }); } else { const receipt = await sendPrivyTransaction({ transaction: tx, connection, address: signerAddr }); proofSig = receipt.signature; } }
             await confirmMilestoneProofOnchain(activeMilestone.id, { onchainProofUri: proofUri, txSignature: proofSig });
-            toast.success("Voting opened on-chain");
-            await load();
-            setProof(await fetchMilestoneProof(activeMilestone.id));
-        } catch (e: unknown) {
-            toast.error("On-chain proof sync failed", { description: e instanceof Error ? e.message : "Error" });
-        } finally {
-            setProofSyncLoading(false);
-        }
+            toast.success("Voting opened on-chain"); await load(); setProof(await fetchMilestoneProof(activeMilestone.id));
+        } catch (e: unknown) { toast.error("On-chain proof sync failed", { description: e instanceof Error ? e.message : "Error" }); } finally { setProofSyncLoading(false); }
     };
 
     const handlePostUpdate = async () => {
@@ -273,97 +158,75 @@ export default function ManageCampaignPage({ params }: { params: Promise<{ id: s
             const mediaKeys: string[] = [];
             for (const file of updateFiles) {
                 const { uploadUrl, s3Key } = await presignUpdateMedia(activeMilestone.id, file.name, file.type || "application/octet-stream");
-                const putRes = await fetch(uploadUrl, {
-                    method: "PUT",
-                    body: file,
-                    headers: { "Content-Type": file.type || "application/octet-stream" },
-                });
-                if (!putRes.ok) {
-                    const detail = await putRes.text().catch(() => "");
-                    throw new Error(`Media upload failed (${putRes.status})${detail ? `: ${detail}` : ""}`);
-                }
+                const putRes = await fetch(uploadUrl, { method: "PUT", body: file, headers: { "Content-Type": file.type || "application/octet-stream" } });
+                if (!putRes.ok) { const detail = await putRes.text().catch(() => ""); throw new Error(`Media upload failed (${putRes.status})${detail ? `: ${detail}` : ""}`); }
                 mediaKeys.push(s3Key);
             }
-            await postMilestoneUpdate(activeMilestone.id, {
-                type: updateType,
-                title: updateTitle.trim(),
-                description: updateDesc.trim() || undefined,
-                mediaUrls: mediaKeys,
-            });
-            toast.success("Update posted!");
-            setUpdateTitle(""); setUpdateDesc(""); setUpdateFiles([]);
+            await postMilestoneUpdate(activeMilestone.id, { type: updateType, title: updateTitle.trim(), description: updateDesc.trim() || undefined, mediaUrls: mediaKeys });
+            toast.success("Update posted!"); setUpdateTitle(""); setUpdateDesc(""); setUpdateFiles([]);
             setUpdates(await fetchMilestoneUpdates(activeMilestone.id));
-        } catch (e: unknown) {
-            toast.error("Failed", { description: e instanceof Error ? e.message : "Error" });
-        } finally { setUpdateLoading(false); }
+        } catch (e: unknown) { toast.error("Failed", { description: e instanceof Error ? e.message : "Error" }); } finally { setUpdateLoading(false); }
     };
 
     if (!authenticated) {
         return (
-            <div className="min-h-screen bg-[#050509] text-white"><Navbar />
-                <div className="mx-auto max-w-[1240px] px-6 pt-24 text-center">
-                    <div className="text-5xl mb-4">🔐</div>
-                    <h2 className="text-xl font-bold mb-3">Sign in to manage</h2>
-                    <button onClick={() => login()} className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-semibold shadow-lg shadow-violet-500/20 hover:brightness-110 transition-all">
-                        <Wallet size={15} /> Connect
+            <div className="min-h-screen bg-[#F8F7F4] text-[#1A1F2E]"><Navbar />
+                <div className="mx-auto max-w-[1200px] px-8 pt-32 text-center">
+                    <div className="text-6xl mb-6">🔐</div>
+                    <h2 className="text-2xl font-bold mb-4">Sign in to manage</h2>
+                    <button onClick={() => login()} className="inline-flex items-center gap-2 px-8 py-4 rounded-xl bg-[#2D6A4F] text-white font-semibold text-base hover:bg-[#245A42] transition-all duration-150 min-h-[48px]">
+                        <Wallet size={18} /> Connect
                     </button>
                 </div>
             </div>
         );
     }
 
-    if (loading) return <div className="min-h-screen bg-[#050509] text-white"><Navbar /><main className="mx-auto max-w-[1240px] px-6 pt-12"><div className="skeleton h-52 rounded-2xl" /></main></div>;
-    if (!campaign) return <div className="min-h-screen bg-[#050509] text-white"><Navbar /><main className="mx-auto max-w-[1240px] px-6 pt-20 text-center"><h2 className="text-xl font-bold">Campaign not found</h2></main></div>;
+    if (loading) return <div className="min-h-screen bg-[#F8F7F4] text-[#1A1F2E]"><Navbar /><main className="mx-auto max-w-[1200px] px-8 pt-16"><div className="skeleton h-64 rounded-xl" /></main></div>;
+    if (!campaign) return <div className="min-h-screen bg-[#F8F7F4] text-[#1A1F2E]"><Navbar /><main className="mx-auto max-w-[1200px] px-8 pt-24 text-center"><h2 className="text-2xl font-bold">Campaign not found</h2></main></div>;
 
     const linkedSolanaAccount = user?.linkedAccounts?.find(
         (account) => account.type === "wallet" && "chainType" in account && account.chainType === "solana"
     );
     const linkedAddr =
         linkedSolanaAccount && "address" in linkedSolanaAccount && typeof linkedSolanaAccount.address === "string"
-            ? linkedSolanaAccount.address
-            : undefined;
+            ? linkedSolanaAccount.address : undefined;
     const connectedWallet = publicKey?.toBase58() ?? user?.wallet?.address ?? linkedAddr;
-    const isOwner = Boolean(
-        connectedWallet &&
-        campaign?.org?.walletAddress &&
-        connectedWallet.toLowerCase() === campaign.org.walletAddress.toLowerCase()
-    );
-
+    const isOwner = Boolean(connectedWallet && campaign?.org?.walletAddress && connectedWallet.toLowerCase() === campaign.org.walletAddress.toLowerCase());
     const canSubmitProof = activeMilestone?.state === "PENDING" && !proof;
     const isUnderReview = activeMilestone?.state === "UNDER_REVIEW";
     const canPostUpdate = activeMilestone?.state === "PENDING" || activeMilestone?.state === "UNDER_REVIEW";
 
     return (
-        <div className="min-h-screen bg-[#050509] text-white font-['Inter']">
+        <div className="min-h-screen bg-[#F8F7F4] text-[#1A1F2E]">
             <Navbar />
-            <div className="fixed top-0 left-1/2 -translate-x-1/2 w-[700px] h-[500px] bg-[radial-gradient(ellipse,rgba(124,58,237,0.05)_0%,transparent_70%)] pointer-events-none -z-10" />
 
-            <main className="mx-auto max-w-[1240px] px-6 pt-10 pb-16">
+            <main className="mx-auto max-w-[1200px] px-8 pt-12 pb-24">
                 <Link href={`/campaign/${id}`}>
-                    <button className="flex items-center gap-1.5 text-sm text-white/40 hover:text-white/70 transition-colors mb-5">
-                        <ArrowLeft size={14} /> Back to Campaign
+                    <button className="flex items-center gap-2 text-base text-[#1A1F2E]/40 hover:text-[#1A1F2E]/70 transition-colors duration-150 mb-6 min-h-[44px]">
+                        <ArrowLeft size={16} /> Back to Campaign
                     </button>
                 </Link>
-                <h1 className="text-2xl font-black tracking-tight bg-gradient-to-r from-violet-400 to-indigo-400 bg-clip-text text-transparent mb-1">Manage Campaign</h1>
-                <p className="text-sm text-white/40 mb-8">{campaign.title}</p>
+                <h1 className="text-4xl font-bold tracking-[-0.03em] text-[#1A1F2E] mb-2">Manage Campaign</h1>
+                <p className="text-base text-[#1A1F2E]/40 mb-12">{campaign.title}</p>
 
                 {!isOwner && (
-                    <div className="mb-6 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-300">
+                    <div className="mb-8 rounded-xl border border-[#C2850C]/30 bg-[#C2850C]/[0.06] px-6 py-4 text-base text-[#C2850C]">
                         You are signed in, but this wallet is not the campaign owner wallet. Management actions are blocked.
                     </div>
                 )}
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
 
                     {/* Left: proof */}
-                    <div className="space-y-5">
+                    <div className="space-y-6">
                         {activeMilestone && (
-                            <div className={`p-4 rounded-2xl border ${isUnderReview ? "bg-amber-500/[0.03] border-amber-500/20" : "bg-violet-500/[0.03] border-violet-500/20"}`}>
-                                <p className={`text-xs font-bold uppercase tracking-widest mb-1 ${isUnderReview ? "text-amber-400" : "text-violet-400"}`}>
-                                    {isUnderReview ? "🗳️ Voting in progress" : "⏳ Active Phase"}
+                            <div className={`p-6 rounded-xl border ${isUnderReview ? "bg-[#C2850C]/[0.04] border-[#C2850C]/20" : "bg-[#2D6A4F]/[0.04] border-[#2D6A4F]/20"}`}>
+                                <p className={`text-sm font-bold uppercase tracking-widest mb-2 ${isUnderReview ? "text-[#C2850C]" : "text-[#2D6A4F]"}`}>
+                                    {isUnderReview ? "Voting in progress" : "Active Phase"}
                                 </p>
-                                <p className="font-bold text-sm">Phase {activeMilestone.index + 1}: {activeMilestone.title}</p>
-                                {isUnderReview && <p className="text-xs text-white/40 mt-1">Donors are reviewing your proof and voting.</p>}
+                                <p className="font-bold text-base">Phase {activeMilestone.index + 1}: {activeMilestone.title}</p>
+                                {isUnderReview && <p className="text-sm text-[#1A1F2E]/40 mt-2">Donors are reviewing your proof and voting.</p>}
                             </div>
                         )}
                         {!!campaign.milestones?.length && (
@@ -371,14 +234,10 @@ export default function ManageCampaignPage({ params }: { params: Promise<{ id: s
                                 {campaign.milestones.map((m) => {
                                     const active = activeMilestone?.id === m.id;
                                     return (
-                                        <button
-                                            key={m.id}
-                                            onClick={() => setActiveMilestone(m)}
-                                            className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${active
-                                                ? "bg-violet-500/15 border-violet-500/40 text-violet-300"
-                                                : "bg-white/[0.03] border-white/[0.06] text-white/45 hover:text-white/75"
-                                                }`}
-                                        >
+                                        <button key={m.id} onClick={() => setActiveMilestone(m)}
+                                            className={`shrink-0 px-4 py-2.5 rounded-lg text-sm font-semibold border transition-all duration-150 min-h-[44px] ${active
+                                                ? "bg-[#2D6A4F]/10 border-[#2D6A4F]/30 text-[#2D6A4F]"
+                                                : "bg-[#F0EFEB] border-[#E4E2DC] text-[#1A1F2E]/45 hover:text-[#1A1F2E]/75"}`}>
                                             Phase {m.index + 1}
                                         </button>
                                     );
@@ -386,85 +245,78 @@ export default function ManageCampaignPage({ params }: { params: Promise<{ id: s
                             </div>
                         )}
 
-                        <div className="bg-[#0f0f1a] border border-white/[0.06] rounded-2xl p-6">
-                            <h2 className="text-sm font-bold flex items-center gap-2 mb-5"><FileText size={15} /> Submit Phase Proof</h2>
+                        <div className="bg-white border border-[#E4E2DC] rounded-xl p-8 shadow-[0_4px_12px_rgba(26,31,46,0.06)]">
+                            <h2 className="text-base font-bold flex items-center gap-2 mb-6"><FileText size={18} /> Submit Phase Proof</h2>
                             {proof && (
-                                <div className="mb-4 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3">
-                                    <p className="text-xs font-semibold text-emerald-300">Proof already submitted</p>
-                                    <p className="text-[11px] text-white/40 mt-1">
-                                        Submitted on {new Date(proof.submittedAt).toLocaleString("en-IN")} · Hash {proof.invoiceHash.slice(0, 12)}...
+                                <div className="mb-6 rounded-xl border border-[#2D6A4F]/20 bg-[#2D6A4F]/[0.04] p-6">
+                                    <p className="text-sm font-semibold text-[#2D6A4F]">Proof already submitted</p>
+                                    <p className="text-sm text-[#1A1F2E]/40 mt-2">
+                                        Submitted on {new Date(proof.submittedAt).toLocaleString("en-IN")} · Hash <span className="font-['DM_Mono']">{proof.invoiceHash.slice(0, 12)}...</span>
                                     </p>
-                                    <div className="mt-2 flex flex-wrap gap-2 text-[11px]">
-                                        <span className={`px-2 py-1 rounded-md border ${proof.integrityChecked ? "border-emerald-500/30 text-emerald-300" : "border-amber-500/30 text-amber-300"}`}>
+                                    <div className="mt-3 flex flex-wrap gap-2 text-sm">
+                                        <span className={`px-3 py-1.5 rounded-lg border ${proof.integrityChecked ? "border-[#2D6A4F]/30 text-[#2D6A4F]" : "border-[#C2850C]/30 text-[#C2850C]"}`}>
                                             {proof.integrityChecked ? "Invoice hash verified" : "Invoice hash mismatch"}
                                         </span>
                                         {proof.invoiceUrl && (
-                                            <a
-                                                href={proof.invoiceUrl}
-                                                target="_blank"
-                                                rel="noreferrer"
-                                                className="px-2 py-1 rounded-md border border-white/15 text-white/70 hover:text-white hover:border-violet-500/40 transition-all"
-                                            >
+                                            <a href={proof.invoiceUrl} target="_blank" rel="noreferrer"
+                                                className="px-3 py-1.5 rounded-lg border border-[#E4E2DC] text-[#1A1F2E]/60 hover:text-[#1A1F2E] hover:border-[#2D6A4F]/40 transition-all duration-150">
                                                 View invoice
                                             </a>
                                         )}
                                     </div>
                                     {!proof.onchainProofUri && (
-                                        <button
-                                            disabled={!isOwner || proofSyncLoading}
-                                            onClick={handleRetryOnchainProof}
-                                            className="mt-3 w-full py-2.5 rounded-lg border border-amber-500/30 text-amber-300 text-xs font-semibold hover:bg-amber-500/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-                                        >
+                                        <button disabled={!isOwner || proofSyncLoading} onClick={handleRetryOnchainProof}
+                                            className="mt-4 w-full py-3 rounded-xl border border-[#C2850C]/30 text-[#C2850C] text-sm font-semibold hover:bg-[#C2850C]/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-150 min-h-[44px]">
                                             {proofSyncLoading ? "Opening voting on-chain…" : "Retry Opening Voting On-Chain"}
                                         </button>
                                     )}
                                 </div>
                             )}
                             {isUnderReview ? (
-                                <p className="text-sm text-white/30 py-6 text-center">⏳ Proof submitted. Wait for voting.</p>
+                                <p className="text-base text-[#1A1F2E]/30 py-8 text-center">⏳ Proof submitted. Wait for voting.</p>
                             ) : !canSubmitProof ? (
-                                <p className="text-sm text-white/30 py-6 text-center">This phase is {activeMilestone?.state?.toLowerCase()}.</p>
+                                <p className="text-base text-[#1A1F2E]/30 py-8 text-center">This phase is {activeMilestone?.state?.toLowerCase()}.</p>
                             ) : (
-                                <div className="space-y-4">
-                                    <label className="flex items-center gap-2.5 cursor-pointer">
-                                        <input type="checkbox" checked={isUnregistered} onChange={(e) => setIsUnregistered(e.target.checked)} className="accent-violet-500" />
-                                        <span className="text-sm text-white/60">Vendor is unregistered (below ₹40L GST)</span>
+                                <div className="space-y-6">
+                                    <label className="flex items-center gap-3 cursor-pointer min-h-[44px]">
+                                        <input type="checkbox" checked={isUnregistered} onChange={(e) => setIsUnregistered(e.target.checked)} className="w-5 h-5 accent-[#2D6A4F]" />
+                                        <span className="text-base text-[#1A1F2E]/60">Vendor is unregistered (below ₹40L GST)</span>
                                     </label>
                                     {!isUnregistered && (
                                         <div>
-                                            <label className="block text-xs font-semibold text-white/40 uppercase tracking-wider mb-2">Vendor GSTIN *</label>
-                                            <input className={inputCls + " font-mono"} placeholder="e.g. 27AABCE1234F1Z5" value={gstin} maxLength={15} onChange={(e) => setGstin(e.target.value.toUpperCase())} />
-                                            <p className="text-[10px] text-white/20 mt-1">Validated via GST API</p>
+                                            <label className="block text-sm font-semibold text-[#1A1F2E]/40 uppercase tracking-wider mb-2">Vendor GSTIN *</label>
+                                            <input className={inputCls + " font-['DM_Mono']"} placeholder="e.g. 27AABCE1234F1Z5" value={gstin} maxLength={15} onChange={(e) => setGstin(e.target.value.toUpperCase())} />
+                                            <p className="text-sm text-[#1A1F2E]/25 mt-2">Validated via GST API</p>
                                         </div>
                                     )}
-                                    <div className="grid grid-cols-2 gap-3">
+                                    <div className="grid grid-cols-2 gap-4">
                                         <div>
-                                            <label className="block text-xs font-semibold text-white/40 uppercase tracking-wider mb-2">Invoice No.</label>
+                                            <label className="block text-sm font-semibold text-[#1A1F2E]/40 uppercase tracking-wider mb-2">Invoice No.</label>
                                             <input className={inputCls} placeholder="INV-2025-0042" value={invoiceNumber} onChange={(e) => setInvoiceNumber(e.target.value)} />
                                         </div>
                                         <div>
-                                            <label className="block text-xs font-semibold text-white/40 uppercase tracking-wider mb-2">Amount (₹)</label>
+                                            <label className="block text-sm font-semibold text-[#1A1F2E]/40 uppercase tracking-wider mb-2">Amount (₹)</label>
                                             <input className={inputCls} type="number" placeholder="20000" value={invoiceAmount} onChange={(e) => setInvoiceAmount(e.target.value)} />
                                         </div>
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-semibold text-white/40 uppercase tracking-wider mb-2">Voting Window</label>
-                                        <div className="flex items-center gap-3">
-                                            <input type="range" min={48} max={168} step={24} value={votingHours} onChange={(e) => setVotingHours(parseInt(e.target.value))} className="flex-1 accent-violet-500" />
-                                            <span className="text-sm font-bold text-violet-400 min-w-[50px]">{votingHours}h</span>
+                                        <label className="block text-sm font-semibold text-[#1A1F2E]/40 uppercase tracking-wider mb-2">Voting Window</label>
+                                        <div className="flex items-center gap-4">
+                                            <input type="range" min={48} max={168} step={24} value={votingHours} onChange={(e) => setVotingHours(parseInt(e.target.value))} className="flex-1 accent-[#2D6A4F] h-2" />
+                                            <span className="text-base font-bold text-[#2D6A4F] min-w-[56px]">{votingHours}h</span>
                                         </div>
-                                        <p className="text-[10px] text-white/20 mt-1">48h min · 168h max</p>
+                                        <p className="text-sm text-[#1A1F2E]/25 mt-2">48h min · 168h max</p>
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-semibold text-white/40 uppercase tracking-wider mb-2">Invoice File *</label>
-                                        <label className="flex flex-col items-center justify-center gap-2 p-5 border-2 border-dashed border-white/[0.08] rounded-xl cursor-pointer hover:border-violet-500/30 transition-all">
-                                            <Upload size={18} className="text-white/25" />
-                                            <span className="text-xs text-white/30">{invoiceFile ? invoiceFile.name : "Click to upload PDF, JPG, PNG"}</span>
+                                        <label className="block text-sm font-semibold text-[#1A1F2E]/40 uppercase tracking-wider mb-2">Invoice File *</label>
+                                        <label className="flex flex-col items-center justify-center gap-3 p-8 border-2 border-dashed border-[#E4E2DC] rounded-xl cursor-pointer hover:border-[#2D6A4F]/30 transition-all duration-150">
+                                            <Upload size={24} className="text-[#1A1F2E]/25" />
+                                            <span className="text-sm text-[#1A1F2E]/30">{invoiceFile ? invoiceFile.name : "Click to upload PDF, JPG, PNG"}</span>
                                             <input type="file" accept=".pdf,.jpg,.jpeg,.png" className="hidden" onChange={(e) => setInvoiceFile(e.target.files?.[0] ?? null)} />
                                         </label>
                                     </div>
                                     <button disabled={!isOwner || proofLoading || !invoiceFile || (!isUnregistered && !gstin)} onClick={handleSubmitProof}
-                                        className="w-full py-3.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-semibold shadow-lg shadow-violet-500/20 hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed transition-all">
+                                        className="w-full py-4 rounded-xl bg-[#2D6A4F] text-white font-semibold text-base hover:bg-[#245A42] disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-150 min-h-[48px]">
                                         {proofLoading ? "Uploading & Validating…" : "Submit Proof & Open Voting"}
                                     </button>
                                 </div>
@@ -473,54 +325,47 @@ export default function ManageCampaignPage({ params }: { params: Promise<{ id: s
                     </div>
 
                     {/* Right: DPR updates */}
-                    <div className="space-y-5">
-                        <div className="bg-[#0f0f1a] border border-white/[0.06] rounded-2xl p-6">
-                            <h2 className="text-sm font-bold flex items-center gap-2 mb-5"><Plus size={15} /> Post Activity Update</h2>
-                            <div className="space-y-4">
+                    <div className="space-y-6">
+                        <div className="bg-white border border-[#E4E2DC] rounded-xl p-8 shadow-[0_4px_12px_rgba(26,31,46,0.06)]">
+                            <h2 className="text-base font-bold flex items-center gap-2 mb-6"><Plus size={18} /> Post Activity Update</h2>
+                            <div className="space-y-6">
                                 <div>
-                                    <label className="block text-xs font-semibold text-white/40 uppercase tracking-wider mb-2">Type</label>
+                                    <label className="block text-sm font-semibold text-[#1A1F2E]/40 uppercase tracking-wider mb-2">Type</label>
                                     <select className={inputCls + " appearance-none"} value={updateType} onChange={(e) => setUpdateType(e.target.value)}>
                                         {UPDATE_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-semibold text-white/40 uppercase tracking-wider mb-2">Title *</label>
+                                    <label className="block text-sm font-semibold text-[#1A1F2E]/40 uppercase tracking-wider mb-2">Title *</label>
                                     <input className={inputCls} placeholder="e.g. Venue deposit paid to Raj Events" value={updateTitle} onChange={(e) => setUpdateTitle(e.target.value)} />
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-semibold text-white/40 uppercase tracking-wider mb-2">Details</label>
-                                <textarea className={inputCls + " min-h-[80px] resize-y"} placeholder="Additional context for donors…" value={updateDesc} onChange={(e) => setUpdateDesc(e.target.value)} />
+                                    <label className="block text-sm font-semibold text-[#1A1F2E]/40 uppercase tracking-wider mb-2">Details</label>
+                                    <textarea className={inputCls + " min-h-[100px] resize-y"} placeholder="Additional context for donors…" value={updateDesc} onChange={(e) => setUpdateDesc(e.target.value)} />
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-semibold text-white/40 uppercase tracking-wider mb-2">Attach Photos / Files</label>
-                                    <label className="flex flex-col items-center justify-center gap-2 p-4 border-2 border-dashed border-white/[0.08] rounded-xl cursor-pointer hover:border-violet-500/30 transition-all">
-                                        <Upload size={16} className="text-white/25" />
-                                        <span className="text-xs text-white/30">
+                                    <label className="block text-sm font-semibold text-[#1A1F2E]/40 uppercase tracking-wider mb-2">Attach Photos / Files</label>
+                                    <label className="flex flex-col items-center justify-center gap-3 p-6 border-2 border-dashed border-[#E4E2DC] rounded-xl cursor-pointer hover:border-[#2D6A4F]/30 transition-all duration-150">
+                                        <Upload size={20} className="text-[#1A1F2E]/25" />
+                                        <span className="text-sm text-[#1A1F2E]/30">
                                             {updateFiles.length ? `${updateFiles.length} file(s) selected` : "Click to upload images/docs"}
                                         </span>
-                                        <input
-                                            type="file"
-                                            multiple
-                                            accept=".pdf,.jpg,.jpeg,.png,.webp,.mp4"
-                                            className="hidden"
-                                            onChange={(e) => setUpdateFiles(Array.from(e.target.files ?? []))}
-                                        />
+                                        <input type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.webp,.mp4" className="hidden"
+                                            onChange={(e) => setUpdateFiles(Array.from(e.target.files ?? []))} />
                                     </label>
                                     {!!updateFiles.length && (
-                                        <p className="text-[11px] text-white/35 mt-2 truncate">
-                                            {updateFiles.map((file) => file.name).join(", ")}
-                                        </p>
+                                        <p className="text-sm text-[#1A1F2E]/35 mt-2 truncate">{updateFiles.map((f) => f.name).join(", ")}</p>
                                     )}
                                 </div>
                                 <button disabled={!isOwner || !canPostUpdate || updateLoading || !updateTitle.trim()} onClick={handlePostUpdate}
-                                    className="w-full py-3 rounded-xl border border-violet-500/30 text-violet-300 font-semibold hover:bg-violet-500/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all">
-                                    {updateLoading ? "Posting…" : !canPostUpdate ? "Phase Closed" : "📋 Post Update"}
+                                    className="w-full py-3.5 rounded-xl border border-[#2D6A4F]/30 text-[#2D6A4F] font-semibold text-base hover:bg-[#2D6A4F]/[0.06] disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-150 min-h-[48px]">
+                                    {updateLoading ? "Posting…" : !canPostUpdate ? "Phase Closed" : "Post Update"}
                                 </button>
                             </div>
                         </div>
 
-                        <div className="bg-[#0f0f1a] border border-white/[0.06] rounded-2xl p-5">
-                            <h3 className="text-sm font-bold mb-4">Activity Log</h3>
+                        <div className="bg-white border border-[#E4E2DC] rounded-xl p-8 shadow-[0_4px_12px_rgba(26,31,46,0.06)]">
+                            <h3 className="text-base font-bold mb-6">Activity Log</h3>
                             <DprTimeline updates={updates} title="" />
                         </div>
                     </div>

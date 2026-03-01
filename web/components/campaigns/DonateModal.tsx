@@ -30,17 +30,11 @@ export function DonateModal({ campaign, open, onClose, onSuccess }: Props) {
   if (!open) return null;
 
   const linkedSolanaAccount = user?.linkedAccounts?.find(
-    (account) =>
-      account.type === "wallet" &&
-      "chainType" in account &&
-      account.chainType === "solana"
+    (account) => account.type === "wallet" && "chainType" in account && account.chainType === "solana"
   );
   const linkedAddr =
-    linkedSolanaAccount &&
-    "address" in linkedSolanaAccount &&
-    typeof linkedSolanaAccount.address === "string"
-      ? linkedSolanaAccount.address
-      : undefined;
+    linkedSolanaAccount && "address" in linkedSolanaAccount && typeof linkedSolanaAccount.address === "string"
+      ? linkedSolanaAccount.address : undefined;
   const walletAddr = publicKey?.toBase58() ?? user?.wallet?.address ?? linkedAddr;
 
   const resolveProjectPDA = (): PublicKey | null => {
@@ -58,91 +52,75 @@ export function DonateModal({ campaign, open, onClose, onSuccess }: Props) {
     if (!projectPDA) { toast.error("Campaign not yet on-chain"); return; }
     const amountSol = parseFloat(amount);
     if (!amountSol || amountSol <= 0) { toast.error("Enter a valid amount"); return; }
-
     setLoading(true);
     try {
       const lamports = Math.floor(amountSol * LAMPORTS_PER_SOL);
       const provider = new AnchorProvider(connection, {} as never, { commitment: "confirmed" });
       const tx = await buildDonateTx(getProgram(provider), new PublicKey(walletAddr), projectPDA, lamports);
       const { blockhash } = await connection.getLatestBlockhash("confirmed");
-      tx.feePayer = new PublicKey(walletAddr);
-      tx.recentBlockhash = blockhash;
+      tx.feePayer = new PublicKey(walletAddr); tx.recentBlockhash = blockhash;
       const sig = publicKey
         ? await sendWalletAdapterTransaction(tx, connection)
         : (await sendPrivyTransaction({ transaction: tx, connection, address: walletAddr })).signature;
       const latest = await connection.getLatestBlockhash("confirmed");
-      await connection.confirmTransaction(
-        {
-          signature: sig,
-          blockhash: latest.blockhash,
-          lastValidBlockHeight: latest.lastValidBlockHeight,
-        },
-        "confirmed"
-      );
+      await connection.confirmTransaction({ signature: sig, blockhash: latest.blockhash, lastValidBlockHeight: latest.lastValidBlockHeight }, "confirmed");
       setTxSig(sig);
       try { await recordSolDonation({ campaignId: campaign.id, amountLamports: lamports, txSignature: sig, donorWallet: walletAddr }); }
       catch (e) { console.warn("Backend record failed (non-critical):", e); }
       toast.success("Donation sent! 🎉");
       onSuccess?.();
-    } catch (e: unknown) {
-      toast.error("Donation failed", { description: e instanceof Error ? e.message : "Transaction failed" });
-    } finally { setLoading(false); }
+    } catch (e: unknown) { toast.error("Donation failed", { description: e instanceof Error ? e.message : "Transaction failed" }); }
+    finally { setLoading(false); }
   };
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fadeIn"
+      className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-[#1A1F2E]/40 backdrop-blur-sm animate-fadeIn"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="w-full max-w-md bg-[#0f0f1a] border border-white/[0.08] rounded-3xl p-8 animate-slideUp shadow-2xl shadow-black/50">
+      <div className="w-full max-w-md bg-white border border-[#E4E2DC] rounded-xl p-8 animate-slideUp shadow-[0_16px_48px_rgba(26,31,46,0.18)]">
 
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-8">
           <div>
-            <h3 className="text-lg font-bold text-white">Donate SOL</h3>
-            <p className="text-sm text-white/40 mt-0.5">Funds go into an on-chain escrow vault</p>
+            <h3 className="text-xl font-bold text-[#1A1F2E]">Donate SOL</h3>
+            <p className="text-sm text-[#1A1F2E]/35 mt-1">Funds go into an on-chain escrow vault</p>
           </div>
-          <button onClick={onClose} className="p-2 rounded-lg text-white/30 hover:text-white/60 hover:bg-white/5 transition-all">
-            <X size={16} />
+          <button onClick={onClose} className="p-3 rounded-xl text-[#1A1F2E]/30 hover:text-[#1A1F2E]/60 hover:bg-[#F0EFEB] transition-all duration-150 min-w-[44px] min-h-[44px] flex items-center justify-center">
+            <X size={18} />
           </button>
         </div>
 
         {txSig ? (
-          /* Success state */
-          <div className="text-center py-4">
-            <div className="text-5xl mb-4">🎉</div>
-            <p className="font-bold text-lg text-white mb-2">Donation Sent!</p>
-            <a
-              href={`https://solscan.io/tx/${txSig}?cluster=devnet`}
-              target="_blank" rel="noreferrer"
-              className="inline-flex items-center gap-1.5 text-sm text-violet-400 hover:text-violet-300 transition-colors mb-6"
-            >
-              <ExternalLink size={13} /> View on Solscan
+          <div className="text-center py-6">
+            <div className="text-6xl mb-6">🎉</div>
+            <p className="font-bold text-xl text-[#1A1F2E] mb-3">Donation Sent!</p>
+            <a href={`https://solscan.io/tx/${txSig}?cluster=devnet`} target="_blank" rel="noreferrer"
+              className="inline-flex items-center gap-2 text-base text-[#2D6A4F] hover:text-[#245A42] transition-colors duration-150 mb-8">
+              <ExternalLink size={16} /> View on Solscan
             </a>
             <button onClick={() => { setTxSig(null); setAmount(""); onClose(); }}
-              className="w-full py-3 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-semibold hover:brightness-110 transition-all">
+              className="w-full py-4 rounded-xl bg-[#2D6A4F] text-white font-semibold text-base hover:bg-[#245A42] transition-all duration-150 min-h-[48px]">
               Done
             </button>
           </div>
         ) : (
           <>
-            {/* Amount input */}
-            <div className="mb-4">
-              <label className="block text-xs font-semibold text-white/40 uppercase tracking-wider mb-2">Amount (SOL)</label>
+            <div className="mb-6">
+              <label className="block text-sm font-semibold text-[#1A1F2E]/40 uppercase tracking-wider mb-2">Amount (SOL)</label>
               <input
                 type="number" min="0.001" step="0.01" placeholder="0.0"
                 value={amount} onChange={(e) => setAmount(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl bg-[#161625] border border-white/[0.08] text-white text-base font-semibold placeholder-white/20 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500/30 transition-all"
+                className="w-full px-4 py-4 rounded-xl bg-[#F8F7F4] border border-[#E4E2DC] text-[#1A1F2E] text-xl font-bold placeholder-[#1A1F2E]/20 focus:outline-none focus:border-[#2D6A4F] focus:ring-1 focus:ring-[#2D6A4F]/20 transition-all duration-150 min-h-[56px]"
               />
             </div>
 
-            {/* Quick amounts */}
-            <div className="grid grid-cols-4 gap-2 mb-5">
+            <div className="grid grid-cols-4 gap-3 mb-8">
               {QUICK.map((v) => (
                 <button key={v} onClick={() => setAmount(v.toString())}
-                  className={`py-2 rounded-lg text-sm font-semibold border transition-all ${amount === v.toString()
-                      ? "bg-violet-500/20 border-violet-500/40 text-violet-300"
-                      : "bg-white/[0.03] border-white/[0.06] text-white/40 hover:bg-white/[0.07] hover:text-white/70"
+                  className={`py-3 rounded-xl text-base font-semibold border transition-all duration-150 min-h-[48px] ${amount === v.toString()
+                    ? "bg-[#2D6A4F]/10 border-[#2D6A4F]/30 text-[#2D6A4F]"
+                    : "bg-[#F8F7F4] border-[#E4E2DC] text-[#1A1F2E]/35 hover:bg-[#F0EFEB] hover:text-[#1A1F2E]/55"
                     }`}>
                   {v}
                 </button>
@@ -150,19 +128,18 @@ export function DonateModal({ campaign, open, onClose, onSuccess }: Props) {
             </div>
 
             {!walletAddr && (
-              <div className="flex items-center gap-2 p-3 rounded-xl bg-amber-500/8 border border-amber-500/20 text-amber-400 text-sm mb-4">
-                <Zap size={14} /> Connect your wallet to donate
+              <div className="flex items-center gap-3 p-4 rounded-xl bg-[#C2850C]/[0.06] border border-[#C2850C]/20 text-[#C2850C] text-base mb-6">
+                <Zap size={18} /> Connect your wallet to donate
               </div>
             )}
 
-            {/* Actions */}
-            <div className="flex gap-3">
+            <div className="flex gap-4">
               <button onClick={onClose}
-                className="px-5 py-3 rounded-xl border border-white/[0.08] text-white/50 text-sm font-semibold hover:bg-white/5 transition-all">
+                className="px-6 py-3.5 rounded-xl border border-[#E4E2DC] text-[#1A1F2E]/45 text-base font-semibold hover:bg-[#F0EFEB] transition-all duration-150 min-h-[48px]">
                 Cancel
               </button>
               <button onClick={onDonate} disabled={loading || !amount || !walletAddr}
-                className="flex-1 py-3 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-semibold hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-lg shadow-violet-500/20">
+                className="flex-1 py-4 rounded-xl bg-[#2D6A4F] text-white font-semibold text-base hover:bg-[#245A42] disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-150 min-h-[48px]">
                 {loading ? "Sending…" : `Donate ${amount || "0"} SOL`}
               </button>
             </div>

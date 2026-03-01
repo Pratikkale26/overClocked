@@ -6,10 +6,10 @@ import { formatGoalProgress, formatSol } from "../../lib/utils";
 import type { Campaign } from "../../lib/api";
 
 const STATE_STYLES: Record<string, string> = {
-  ACTIVE: "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20",
-  COMPLETED: "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20",
-  FAILED: "bg-red-500/10 text-red-400 border border-red-500/20",
-  FROZEN: "bg-indigo-500/10 text-indigo-400 border border-indigo-500/20",
+  ACTIVE: "bg-[#2D6A4F]/10 text-[#2D6A4F] border border-[#2D6A4F]/20",
+  COMPLETED: "bg-[#2D6A4F]/10 text-[#2D6A4F] border border-[#2D6A4F]/20",
+  FAILED: "bg-[#C44536]/10 text-[#C44536] border border-[#C44536]/20",
+  FROZEN: "bg-[#1A1F2E]/10 text-[#1A1F2E]/60 border border-[#1A1F2E]/15",
 };
 const STATE_LABEL: Record<string, string> = {
   ACTIVE: "Live", COMPLETED: "Done", FAILED: "Failed", FROZEN: "Frozen",
@@ -21,29 +21,28 @@ export function CampaignCard({ campaign }: { campaign: Campaign }) {
 
   return (
     <Link href={`/campaign/${campaign.id}`} className="group block">
-      <div className="bg-[#0f0f1a] border border-white/[0.06] rounded-2xl overflow-hidden hover:border-violet-500/20 hover:-translate-y-1 hover:shadow-2xl hover:shadow-black/40 transition-all duration-300">
+      <div className="bg-white border border-[#E4E2DC] rounded-xl overflow-hidden shadow-[0_4px_12px_rgba(26,31,46,0.06)] hover:border-[#C5C3BD] hover:-translate-y-[2px] hover:shadow-[0_8px_24px_rgba(26,31,46,0.10)] transition-all duration-200">
 
         {/* Banner area */}
         <div
-          className="h-36 relative"
+          className="h-40 relative"
           style={{
             background: campaign.bannerUrl
               ? `url(${campaign.bannerUrl}) center/cover`
-              : "linear-gradient(135deg, rgba(124,58,237,0.12) 0%, rgba(79,70,229,0.06) 60%, rgba(6,182,212,0.04) 100%)",
+              : "linear-gradient(135deg, rgba(45,106,79,0.08) 0%, rgba(26,31,46,0.04) 60%, rgba(45,106,79,0.03) 100%)",
           }}
         >
-          {/* Overlay gradient */}
-          <div className="absolute inset-0 bg-gradient-to-t from-[#0f0f1a]/60 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-white/40 to-transparent" />
 
-          <div className="absolute top-3 right-3">
-            <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full ${STATE_STYLES[campaign.state] ?? ""}`}>
+          <div className="absolute top-4 right-4">
+            <span className={`text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded-lg ${STATE_STYLES[campaign.state] ?? ""}`}>
               {STATE_LABEL[campaign.state] ?? campaign.state}
             </span>
           </div>
 
           {campaign.category && (
-            <div className="absolute bottom-3 left-3">
-              <span className="text-[10px] font-medium px-2.5 py-1 rounded-full bg-white/10 backdrop-blur-sm text-white/70 border border-white/10">
+            <div className="absolute bottom-4 left-4">
+              <span className="text-xs font-medium px-3 py-1.5 rounded-lg bg-white/80 backdrop-blur-sm text-[#1A1F2E]/70 border border-[#E4E2DC]">
                 {campaign.category.replace("_", " ")}
               </span>
             </div>
@@ -51,25 +50,25 @@ export function CampaignCard({ campaign }: { campaign: Campaign }) {
         </div>
 
         {/* Content */}
-        <div className="p-5">
+        <div className="p-6">
           {campaign.org && (
-            <p className="text-[11px] font-semibold text-violet-400/80 uppercase tracking-widest mb-1.5">
+            <p className="text-xs font-semibold text-[#2D6A4F] uppercase tracking-widest mb-2">
               {campaign.org.name}
             </p>
           )}
 
-          <h3 className="text-base font-bold leading-snug mb-2 line-clamp-2 text-white/90">
+          <h3 className="text-lg font-bold leading-snug mb-2 line-clamp-2 text-[#1A1F2E]">
             {campaign.title}
           </h3>
 
-          <p className="text-sm text-white/40 leading-relaxed line-clamp-2 mb-4">
+          <p className="text-base text-[#1A1F2E]/45 leading-relaxed line-clamp-2 mb-6">
             {campaign.description}
           </p>
 
           {/* Progress bar */}
-          <div className="h-1.5 w-full bg-white/[0.05] rounded-full overflow-hidden mb-3">
+          <div className="h-2 w-full bg-[#F0EFEB] rounded-full overflow-hidden mb-4">
             <div
-              className="h-full rounded-full bg-gradient-to-r from-violet-600 to-violet-400 transition-all duration-700 progress-glow"
+              className="h-full rounded-full bg-[#2D6A4F] transition-all duration-700 progress-animate"
               style={{ width: `${Math.min(pct, 100)}%` }}
             />
           </div>
@@ -77,18 +76,18 @@ export function CampaignCard({ campaign }: { campaign: Campaign }) {
           {/* Stats row */}
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-bold text-violet-300">
+              <p className="text-base font-bold text-[#2D6A4F]">
                 {formatSol(campaign.raisedLamports)}
               </p>
               {campaign.hasGoal && (
-                <p className="text-[11px] text-white/30">
+                <p className="text-sm text-[#1A1F2E]/30">
                   of {formatSol(campaign.totalGoalLamports)} · {pct.toFixed(0)}%
                 </p>
               )}
             </div>
-            <div className="flex gap-3 text-[11px] text-white/30">
-              <span className="flex items-center gap-1"><Users size={11} />{donors}</span>
-              <span className="flex items-center gap-1"><TrendingUp size={11} />{campaign.milestones?.length ?? 0} phases</span>
+            <div className="flex gap-4 text-sm text-[#1A1F2E]/30">
+              <span className="flex items-center gap-1.5"><Users size={14} />{donors}</span>
+              <span className="flex items-center gap-1.5"><TrendingUp size={14} />{campaign.milestones?.length ?? 0} phases</span>
             </div>
           </div>
         </div>

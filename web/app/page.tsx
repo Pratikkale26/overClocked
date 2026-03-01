@@ -8,18 +8,11 @@ import { CampaignCard } from "../components/campaigns/CampaignCard";
 import { fetchCampaigns, type Campaign } from "../lib/api";
 
 const FEATURES = [
-  { icon: Shield, color: "violet", title: "Milestone-Locked Escrow", desc: "Funds release only when donors verify work is done on-chain." },
-  { icon: Vote, color: "cyan", title: "Stake-Weighted Voting", desc: "Your donation size = your voting power. Transparent and fair." },
-  { icon: TrendingUp, color: "emerald", title: "On-Chain Reputation", desc: "Every org's track record is public and immutable on Solana." },
-  { icon: Zap, color: "amber", title: "GST-Verified Proofs", desc: "Invoice hashes form a tamper-evident proof-of-history chain." },
+  { icon: Shield, title: "Milestone-Locked Escrow", desc: "Funds release only when donors verify work is done on-chain." },
+  { icon: Vote, title: "Stake-Weighted Voting", desc: "Your donation size = your voting power. Transparent and fair." },
+  { icon: TrendingUp, title: "On-Chain Reputation", desc: "Every org's track record is public and immutable on Solana." },
+  { icon: Zap, title: "GST-Verified Proofs", desc: "Invoice hashes form a tamper-evident proof-of-history chain." },
 ];
-
-const ICON_COLORS: Record<string, string> = {
-  violet: "bg-violet-500/10 border-violet-500/20 text-violet-400",
-  cyan: "bg-cyan-500/10   border-cyan-500/20   text-cyan-400",
-  emerald: "bg-emerald-500/10 border-emerald-500/20 text-emerald-400",
-  amber: "bg-amber-500/10  border-amber-500/20  text-amber-400",
-};
 
 export default function Home() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
@@ -29,43 +22,36 @@ export default function Home() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-[#050509] text-white font-['Inter']">
+    <div className="min-h-screen bg-[#F8F7F4] text-[#1A1F2E]">
       <Navbar />
 
-      {/* Ambient background glow */}
-      <div className="fixed top-0 left-1/2 -translate-x-1/2 w-[900px] h-[600px] bg-[radial-gradient(ellipse,rgba(124,58,237,0.07)_0%,transparent_70%)] pointer-events-none -z-10" />
-
       {/* ── Hero ─────────────────────────────────── */}
-      <section className="relative pt-28 pb-20 overflow-hidden text-center">
-        {/* Orbs */}
-        <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-[radial-gradient(circle,rgba(124,58,237,0.07),transparent_70%)] blur-3xl pointer-events-none" />
-        <div className="absolute top-0 right-1/4 w-[400px] h-[400px] bg-[radial-gradient(circle,rgba(79,70,229,0.05),transparent_70%)] blur-3xl pointer-events-none" />
-
-        <div className="relative mx-auto max-w-[1240px] px-6">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-violet-500/10 border border-violet-500/20 text-violet-400 text-xs font-semibold uppercase tracking-wider mb-7">
-            <Zap size={11} /> Built on Solana — Devnet
+      <section className="relative pt-32 pb-24 overflow-hidden text-center">
+        <div className="relative mx-auto max-w-[1200px] px-8">
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#2D6A4F]/8 border border-[#2D6A4F]/15 text-[#2D6A4F] text-sm font-semibold uppercase tracking-wider mb-8">
+            <Zap size={14} /> Built on Solana
           </div>
 
-          <h1 className="text-5xl sm:text-6xl font-black tracking-tighter leading-[1.05] mb-5">
-            <span className="bg-gradient-to-r from-violet-400 via-purple-400 to-indigo-400 bg-clip-text text-transparent">
+          <h1 className="text-6xl font-bold tracking-[-0.03em] leading-[1.1] mb-6">
+            <span className="text-[#1A1F2E]">
               Programmable Trust
             </span>
             <br />
-            <span className="text-white/90">for Crowdfunding</span>
+            <span className="text-[#1A1F2E]/70">for Crowdfunding</span>
           </h1>
 
-          <p className="text-lg text-white/50 max-w-lg mx-auto leading-relaxed mb-10">
+          <p className="text-xl text-[#1A1F2E]/50 max-w-xl mx-auto leading-relaxed mb-12">
             Milestone-locked escrow, stake-weighted donor voting, and on-chain org reputation. Every rupee accounted for.
           </p>
 
-          <div className="flex gap-3 justify-center flex-wrap">
+          <div className="flex gap-4 justify-center flex-wrap">
             <Link href="/explore">
-              <button className="flex items-center gap-2 px-7 py-3.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-semibold text-base shadow-xl shadow-violet-500/25 hover:shadow-violet-500/40 hover:brightness-110 transition-all duration-200">
-                Explore Campaigns <ArrowRight size={16} />
+              <button className="flex items-center gap-2 px-8 py-4 rounded-xl bg-[#2D6A4F] text-white font-semibold text-lg hover:bg-[#245A42] hover:-translate-y-[1px] hover:shadow-[0_8px_24px_rgba(45,106,79,0.2)] transition-all duration-200 min-h-[48px]">
+                Explore Campaigns <ArrowRight size={20} />
               </button>
             </Link>
             <Link href="/create">
-              <button className="flex items-center gap-2 px-7 py-3.5 rounded-xl border border-violet-500/30 text-violet-300 font-semibold text-base hover:bg-violet-500/10 hover:border-violet-500/50 transition-all duration-200">
+              <button className="flex items-center gap-2 px-8 py-4 rounded-xl border border-[#2D6A4F] text-[#2D6A4F] font-semibold text-lg hover:bg-[#2D6A4F]/[0.06] hover:-translate-y-[1px] transition-all duration-200 min-h-[48px]">
                 Start a Campaign
               </button>
             </Link>
@@ -73,17 +59,23 @@ export default function Home() {
         </div>
       </section>
 
+      {/* ── Section Divider ──────────────────────── */}
+      <div className="mx-auto max-w-[1200px] px-8">
+        <div className="border-t border-[#E4E2DC] relative">
+          <div className="absolute left-0 top-0 w-12 h-[2px] bg-[#2D6A4F]" />
+        </div>
+      </div>
+
       {/* ── Features ─────────────────────────────── */}
-      <section className="mx-auto max-w-[1240px] px-6 pb-20">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <section className="mx-auto max-w-[1200px] px-8 py-16">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
           {FEATURES.map((f) => (
-            <div key={f.title} className="relative bg-[#0f0f1a] border border-white/[0.06] rounded-2xl p-6 overflow-hidden">
-              <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-violet-600/30 via-indigo-600/20 to-transparent" />
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center border mb-4 ${ICON_COLORS[f.color]}`}>
-                <f.icon size={18} />
+            <div key={f.title} className="bg-white border border-[#E4E2DC] rounded-xl p-8 shadow-[0_4px_12px_rgba(26,31,46,0.06)] hover:-translate-y-[2px] hover:border-[#C5C3BD] transition-all duration-200">
+              <div className="w-12 h-12 rounded-xl flex items-center justify-center border border-[#2D6A4F]/20 bg-[#2D6A4F]/8 text-[#2D6A4F] mb-6">
+                <f.icon size={22} />
               </div>
-              <h3 className="text-sm font-bold mb-2 text-white/90">{f.title}</h3>
-              <p className="text-[13px] text-white/40 leading-relaxed">{f.desc}</p>
+              <h3 className="text-base font-bold mb-3 text-[#1A1F2E]">{f.title}</h3>
+              <p className="text-base text-[#1A1F2E]/45 leading-relaxed">{f.desc}</p>
             </div>
           ))}
         </div>
@@ -91,21 +83,29 @@ export default function Home() {
 
       {/* ── Campaigns ────────────────────────────── */}
       {campaigns.length > 0 && (
-        <section className="mx-auto max-w-[1240px] px-6 pb-24">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-bold bg-gradient-to-r from-violet-400 to-indigo-400 bg-clip-text text-transparent">
-              Live Campaigns
-            </h2>
-            <Link href="/explore">
-              <button className="flex items-center gap-1.5 text-sm text-white/40 hover:text-white/70 transition-colors">
-                View all <ArrowRight size={13} />
-              </button>
-            </Link>
+        <>
+          <div className="mx-auto max-w-[1200px] px-8">
+            <div className="border-t border-[#E4E2DC] relative">
+              <div className="absolute left-0 top-0 w-12 h-[2px] bg-[#2D6A4F]" />
+            </div>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {campaigns.map((c) => <CampaignCard key={c.id} campaign={c} />)}
-          </div>
-        </section>
+
+          <section className="mx-auto max-w-[1200px] px-8 py-16">
+            <div className="flex justify-between items-center mb-12">
+              <h2 className="text-4xl font-bold tracking-[-0.03em] text-[#1A1F2E]">
+                Live Campaigns
+              </h2>
+              <Link href="/explore">
+                <button className="flex items-center gap-2 text-base text-[#1A1F2E]/40 hover:text-[#1A1F2E]/70 transition-colors duration-150 min-h-[44px]">
+                  View all <ArrowRight size={16} />
+                </button>
+              </Link>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {campaigns.map((c) => <CampaignCard key={c.id} campaign={c} />)}
+            </div>
+          </section>
+        </>
       )}
     </div>
   );

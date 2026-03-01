@@ -1,26 +1,62 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&family=DM+Mono:wght@400;500&display=swap');
 @import "tailwindcss";
 
+/* ────────────────────────────────────────────────────────────────────────────
+   CREDENCE DESIGN TOKENS
+   Spacing: 4px base → 8, 12, 16, 24, 32, 48, 64px
+   Radius: 12px (xl), 8px (lg), full (pills)
+   Type:   60px hero → 36px h1 → 24px h2 → 20px h3 → 16px body → 14px cap → 12px micro
+   ──────────────────────────────────────────────────────────────────────────── */
+
 :root {
-  --violet: #7c3aed;
-  --violet-light: #a78bfa;
-  --indigo: #4f46e5;
-  --success: #22c55e;
-  --warning: #f59e0b;
-  --danger: #ef4444;
+  /* Colors */
+  --bg: #F8F7F4;
+  --surface: #FFFFFF;
+  --border: #E4E2DC;
+  --border-strong: #C5C3BD;
+  --navy: #1A1F2E;
+  --emerald: #2D6A4F;
+  --emerald-hover: #245A42;
+  --emerald-light: #3D8B6A;
+  --emerald-bg: rgba(45, 106, 79, 0.06);
+  --success: #2D6A4F;
+  --warning: #C2850C;
+  --danger: #C44536;
+  --muted: #F0EFEB;
+
+  /* Shadows */
+  --shadow-card: 0 4px 12px rgba(26, 31, 46, 0.06);
+  --shadow-elevated: 0 8px 24px rgba(26, 31, 46, 0.10);
+  --shadow-modal: 0 16px 48px rgba(26, 31, 46, 0.18);
+
+  /* Radius */
+  --radius-xl: 12px;
+  --radius-lg: 8px;
+
+  /* Transitions */
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Fonts */
+  --font-sans: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'DM Mono', 'SF Mono', 'Fira Code', monospace;
 }
 
 * {
   box-sizing: border-box;
 }
 
+html {
+  font-size: 16px;
+}
+
 html,
 body {
   margin: 0;
   padding: 0;
-  font-family: 'Inter', -apple-system, sans-serif;
+  font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+  line-height: 1.6;
+  font-size: 1rem;
 }
 
 /* Scrollbar */
@@ -33,7 +69,7 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(26, 31, 46, 0.12);
   border-radius: 99px;
 }
 
@@ -51,12 +87,18 @@ body {
 @keyframes slideUp {
   from {
     opacity: 0;
-    transform: translateY(16px)
+    transform: translateY(12px)
   }
 
   to {
     opacity: 1;
     transform: translateY(0)
+  }
+}
+
+@keyframes progressGrow {
+  from {
+    width: 0%
   }
 }
 
@@ -83,29 +125,40 @@ body {
 }
 
 .animate-fadeIn {
-  animation: fadeIn 350ms var(--ease-out) both;
+  animation: fadeIn 200ms var(--ease-out) both;
 }
 
 .animate-slideUp {
-  animation: slideUp 350ms var(--ease-out) both;
+  animation: slideUp 200ms var(--ease-out) both;
 }
 
 .skeleton {
-  background: linear-gradient(90deg, #1a1a2e 25%, rgba(255, 255, 255, 0.03) 50%, #1a1a2e 75%);
+  background: linear-gradient(90deg, #F0EFEB 25%, #F8F7F4 50%, #F0EFEB 75%);
   background-size: 800px 100%;
   animation: shimmer 1.5s infinite linear;
-  border-radius: 8px;
+  border-radius: var(--radius-xl);
 }
 
-/* Progress glow */
-.progress-glow {
-  box-shadow: 0 0 10px rgba(124, 58, 237, 0.4);
+.progress-animate {
+  animation: progressGrow 600ms ease both;
 }
 
 /* Wallet adapter override */
 .wallet-adapter-button {
-  background: linear-gradient(135deg, #7c3aed, #4f46e5) !important;
-  border-radius: 10px !important;
-  font-family: inherit !important;
+  background: var(--emerald) !important;
+  border-radius: var(--radius-xl) !important;
+  font-family: var(--font-sans) !important;
   font-weight: 600 !important;
+  min-height: 48px !important;
+  font-size: 1rem !important;
+}
+
+.wallet-adapter-button:hover {
+  background: var(--emerald-hover) !important;
+}
+
+/* Monospace utility for on-chain data */
+.font-mono-chain {
+  font-family: var(--font-mono);
+  letter-spacing: -0.01em;
 }

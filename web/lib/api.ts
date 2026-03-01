@@ -127,6 +127,16 @@ export async function loginWithPrivy(privyToken: string) {
     }
 }
 
+export async function fetchMyCampaigns() {
+    const { data } = await api.get("/campaigns/mine");
+    return data.campaigns as Campaign[];
+}
+
+export async function fetchDonatedCampaigns() {
+    const { data } = await api.get("/campaigns/donated");
+    return data.campaigns as Campaign[];
+}
+
 // ── Milestone / Proof / DPR helpers ───────────────────────────────────
 
 export async function fetchMilestoneProof(milestoneId: string) {

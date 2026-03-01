@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Plus, ArrowRight, TrendingUp, Shield, AlertTriangle } from "lucide-react";
 import { Navbar } from "../../components/layout/Navbar";
-import { fetchCampaigns, type Campaign } from "../../lib/api";
+import { fetchMyCampaigns, fetchDonatedCampaigns, type Campaign } from "../../lib/api";
 import { formatSol, formatGoalProgress, LAMPORTS_PER_SOL, shortenAddress } from "../../lib/utils";
 
 const YIELD_APY = 0.10;
@@ -19,25 +19,39 @@ function computeYield(raised: string, created: string): number {
 
 export default function DashboardPage() {
     const router = useRouter();
-    const { authenticated, ready } = usePrivy();
+    const { authenticated, ready, user } = usePrivy();
     const { publicKey } = useWallet();
-    const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+    const [myCampaigns, setMyCampaigns] = useState<Campaign[]>([]);
+    const [donorCampaigns, setDonorCampaigns] = useState<Campaign[]>([]);
     const [loading, setLoading] = useState(true);
     const [tab, setTab] = useState<"creator" | "donor">("creator");
 
     useEffect(() => {
         if (!ready) return;
         if (!authenticated) { router.replace("/"); return; }
-        fetchCampaigns({ limit: 50 })
-            .then(setCampaigns).catch(() => setCampaigns([]))
+        Promise.allSettled([fetchMyCampaigns(), fetchDonatedCampaigns()])
+            .then(([mine, donated]) => {
+                setMyCampaigns(mine.status === "fulfilled" ? mine.value : []);
+                setDonorCampaigns(donated.status === "fulfilled" ? donated.value : []);
+            })
             .finally(() => setLoading(false));
     }, [ready, authenticated, router]);
 
     if (!ready || !authenticated) return null;
 
-    const wallet = publicKey?.toBase58();
-    const myCampaigns = campaigns;
-    const donorCampaigns = campaigns.filter((c) => c.milestones?.some((m) => m.state === "UNDER_REVIEW" || m.state === "APPROVED"));
+    const linkedSolanaAccount = user?.linkedAccounts?.find(
+        (account) =>
+            account.type === "wallet" &&
+            "chainType" in account &&
+            account.chainType === "solana"
+    );
+    const linkedAddr =
+        linkedSolanaAccount &&
+            "address" in linkedSolanaAccount &&
+            typeof linkedSolanaAccount.address === "string"
+            ? linkedSolanaAccount.address
+            : undefined;
+    const wallet = publicKey?.toBase58() ?? user?.wallet?.address ?? linkedAddr;
     const totalRaised = myCampaigns.reduce((s, c) => s + Number(c.raisedLamports || 0), 0);
     const pendingVotes = donorCampaigns.filter((c) => c.milestones?.some((m) => m.state === "UNDER_REVIEW")).length;
     const totalYield = donorCampaigns.reduce((s, c) => s + computeYield(c.raisedLamports, c.createdAt), 0);

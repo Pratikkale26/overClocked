@@ -6,6 +6,19 @@ import { getPresignedUploadUrl } from "../services/s3.js";
 
 export const campaignsRouter = Router();
 
+function serializeCampaign(campaign: any) {
+    return {
+        ...campaign,
+        totalGoalLamports: campaign.totalGoalLamports.toString(),
+        raisedLamports: campaign.raisedLamports.toString(),
+        prefrontLamports: campaign.prefrontLamports.toString(),
+        milestones: campaign.milestones?.map((m: any) => ({
+            ...m,
+            amountLamports: m.amountLamports.toString(),
+        })) ?? [],
+    };
+}
+
 async function isCampaignOwner(campaignId: string, privyId: string): Promise<boolean> {
     const campaign = await prisma.campaign.findUnique({
         where: { id: campaignId },
@@ -116,19 +129,93 @@ campaignsRouter.get("/", async (req, res) => {
         });
 
         res.json({
-            campaigns: campaigns.map(c => ({
-                ...c,
-                totalGoalLamports: c.totalGoalLamports.toString(),
-                raisedLamports: c.raisedLamports.toString(),
-                prefrontLamports: c.prefrontLamports.toString(),
-                milestones: c.milestones.map(m => ({
-                    ...m,
-                    amountLamports: m.amountLamports.toString(),
-                })),
-            })),
+            campaigns: campaigns.map(serializeCampaign),
         });
     } catch (err) {
         console.error("[campaigns/list]", err);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+/**
+ * GET /api/campaigns/mine
+ * Campaigns created by the authenticated user.
+ */
+campaignsRouter.get("/mine", requireAuth, async (req: AuthedRequest, res) => {
+    try {
+        const user = await prisma.user.findUnique({
+            where: { privyId: req.user!.privyId },
+            include: { org: true },
+        });
+        if (!user?.org) {
+            res.json({ campaigns: [] });
+            return;
+        }
+
+        const campaigns = await prisma.campaign.findMany({
+            where: { orgId: user.org.id },
+            include: {
+                org: { select: { id: true, name: true, logoUrl: true, completionRateBps: true, verified: true } },
+                milestones: { select: { id: true, index: true, title: true, state: true, amountLamports: true } },
+                _count: { select: { donations: true } },
+            },
+            orderBy: { createdAt: "desc" },
+            take: 100,
+        });
+
+        res.json({ campaigns: campaigns.map(serializeCampaign) });
+    } catch (err) {
+        console.error("[campaigns/mine]", err);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+/**
+ * GET /api/campaigns/donated
+ * Distinct campaigns the authenticated user has donated to.
+ */
+campaignsRouter.get("/donated", requireAuth, async (req: AuthedRequest, res) => {
+    try {
+        const user = await prisma.user.findUnique({
+            where: { privyId: req.user!.privyId },
+            select: { id: true, walletAddress: true },
+        });
+        if (!user) {
+            res.status(404).json({ error: "User not found" });
+            return;
+        }
+
+        const wallet = user.walletAddress?.toLowerCase();
+        const donations = await prisma.donation.findMany({
+            where: {
+                confirmed: true,
+                OR: [
+                    { userId: user.id },
+                    ...(wallet ? [{ donorWallet: { equals: wallet, mode: "insensitive" as const } }] : []),
+                ],
+            },
+            select: { campaignId: true },
+            distinct: ["campaignId"],
+        });
+        const campaignIds = donations.map((d) => d.campaignId);
+        if (!campaignIds.length) {
+            res.json({ campaigns: [] });
+            return;
+        }
+
+        const campaigns = await prisma.campaign.findMany({
+            where: { id: { in: campaignIds } },
+            include: {
+                org: { select: { id: true, name: true, logoUrl: true, completionRateBps: true, verified: true } },
+                milestones: { select: { id: true, index: true, title: true, state: true, amountLamports: true } },
+                _count: { select: { donations: true } },
+            },
+            orderBy: { createdAt: "desc" },
+        });
+
+        res.json({ campaigns: campaigns.map(serializeCampaign) });
+    } catch (err) {
+        console.error("[campaigns/donated]", err);
         res.status(500).json({ error: "Internal server error" });
     }
 });

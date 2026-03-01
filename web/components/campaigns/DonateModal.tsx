@@ -70,6 +70,15 @@ export function DonateModal({ campaign, open, onClose, onSuccess }: Props) {
       const sig = publicKey
         ? await sendWalletAdapterTransaction(tx, connection)
         : (await sendPrivyTransaction({ transaction: tx, connection, address: walletAddr })).signature;
+      const latest = await connection.getLatestBlockhash("confirmed");
+      await connection.confirmTransaction(
+        {
+          signature: sig,
+          blockhash: latest.blockhash,
+          lastValidBlockHeight: latest.lastValidBlockHeight,
+        },
+        "confirmed"
+      );
       setTxSig(sig);
       try { await recordSolDonation({ campaignId: campaign.id, amountLamports: lamports, txSignature: sig, donorWallet: walletAddr }); }
       catch (e) { console.warn("Backend record failed (non-critical):", e); }

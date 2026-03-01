@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { usePrivy } from "@privy-io/react-auth";
+import { useSendTransaction } from "@privy-io/react-auth/solana";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
 import { AnchorProvider } from "@coral-xyz/anchor";
@@ -24,12 +26,26 @@ export function VotingPanel({ milestone, proof, campaign, onVoted }: Props) {
     const [voted, setVoted] = useState(false);
     const [loading, setLoading] = useState(false);
     const [tally, setTally] = useState<{ yes: number; no: number; eligible: number } | null>(null);
+    const { user } = usePrivy();
+    const { sendTransaction: sendPrivyTransaction } = useSendTransaction();
     const { connection } = useConnection();
-    const { publicKey, sendTransaction } = useWallet();
+    const { publicKey, sendTransaction: sendWalletAdapterTransaction } = useWallet();
 
     if (milestone.state !== "UNDER_REVIEW") return null;
 
-    const walletAddr = publicKey?.toBase58();
+    const linkedSolanaAccount = user?.linkedAccounts?.find(
+        (account) =>
+            account.type === "wallet" &&
+            "chainType" in account &&
+            account.chainType === "solana"
+    );
+    const linkedAddr =
+        linkedSolanaAccount &&
+            "address" in linkedSolanaAccount &&
+            typeof linkedSolanaAccount.address === "string"
+            ? linkedSolanaAccount.address
+            : undefined;
+    const walletAddr = publicKey?.toBase58() ?? user?.wallet?.address ?? linkedAddr;
 
     const resolvePDA = useCallback((): PublicKey | null => {
         if (campaign.onchainProjectPda) return new PublicKey(campaign.onchainProjectPda);
@@ -45,7 +61,7 @@ export function VotingPanel({ milestone, proof, campaign, onVoted }: Props) {
             const pda = resolvePDA();
             if (!pda) return;
             try {
-                const provider = new AnchorProvider(connection, {} as any, { commitment: "confirmed" });
+                const provider = new AnchorProvider(connection, {} as never, { commitment: "confirmed" });
                 const program = getProgram(provider);
                 const project = await fetchProjectAccount(program, pda);
                 if (project?.milestones?.[milestone.index]) {
@@ -70,9 +86,16 @@ export function VotingPanel({ milestone, proof, campaign, onVoted }: Props) {
         if (!pda) { toast.error("Campaign not yet on-chain"); return; }
         setLoading(true);
         try {
-            const provider = new AnchorProvider(connection, {} as any, { commitment: "confirmed" });
+            const provider = new AnchorProvider(connection, {} as never, { commitment: "confirmed" });
             const tx = await buildVoteMilestoneTx(getProgram(provider), new PublicKey(walletAddr), pda, milestone.index, approve);
-            await sendTransaction(tx, connection);
+            const { blockhash } = await connection.getLatestBlockhash("confirmed");
+            tx.feePayer = new PublicKey(walletAddr);
+            tx.recentBlockhash = blockhash;
+            if (publicKey) {
+                await sendWalletAdapterTransaction(tx, connection);
+            } else {
+                await sendPrivyTransaction({ transaction: tx, connection, address: walletAddr });
+            }
             setVoted(true);
             toast.success(approve ? "Voted YES ✅" : "Voted NO ❌", { description: "Stake-weighted vote recorded on-chain." });
             onVoted?.();

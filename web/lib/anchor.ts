@@ -222,6 +222,41 @@ export async function buildVoteMilestoneTx(
         .transaction();
 }
 
+export async function buildSubmitMilestoneProofTx(
+    program: Program,
+    creator: PublicKey,
+    projectPDA: PublicKey,
+    milestoneIndex: number,
+    proofUri: string,
+    invoiceHashHex: string,
+    vendorGstinHashBytes: number[],
+    votingWindowSecs: number
+) {
+    const invoiceHashBytes = Array.from(Buffer.from(invoiceHashHex, "hex"));
+    if (invoiceHashBytes.length !== 32) {
+        throw new Error("Invalid invoice hash: expected 32-byte hex");
+    }
+    if (vendorGstinHashBytes.length !== 32) {
+        throw new Error("Invalid vendor GSTIN hash: expected 32 bytes");
+    }
+    const [orgPDA] = deriveOrgPDA(creator);
+
+    return program.methods
+        .submitMilestoneProof(
+            milestoneIndex,
+            proofUri,
+            invoiceHashBytes,
+            vendorGstinHashBytes,
+            new BN(votingWindowSecs)
+        )
+        .accounts({
+            creator,
+            project: projectPDA,
+            org: orgPDA,
+        })
+        .transaction();
+}
+
 // ── Account Fetching ──────────────────────────────────────────────────────────
 
 export async function fetchProjectAccount(

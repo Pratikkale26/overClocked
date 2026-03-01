@@ -3,23 +3,48 @@
 import { use, useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { usePrivy } from "@privy-io/react-auth";
+import {
+    useConnectedStandardWallets,
+    useSendTransaction,
+    useStandardSignAndSendTransaction,
+} from "@privy-io/react-auth/solana";
+import { useConnection, useWallet } from "@solana/wallet-adapter-react";
+import { PublicKey } from "@solana/web3.js";
+import { AnchorProvider } from "@coral-xyz/anchor";
 import { toast } from "sonner";
 import { ArrowLeft, Upload, Plus, FileText, Wallet } from "lucide-react";
 import { Navbar } from "../../../../components/layout/Navbar";
 import { DprTimeline } from "../../../../components/campaigns/DprTimeline";
 import {
     fetchCampaign, fetchMilestoneUpdates, postMilestoneUpdate,
-    submitMilestoneProof, presignProofUpload, fetchMilestoneProof,
+    submitMilestoneProof, presignProofUpload, fetchMilestoneProof, confirmMilestoneProofOnchain,
     type Campaign, type Milestone, type MilestoneUpdate, type MilestoneProof,
 } from "../../../../lib/api";
+import {
+    buildSubmitMilestoneProofTx,
+    deriveProjectPDA,
+    getProgram,
+    hexToProjectId,
+} from "../../../../lib/anchor";
 
 const UPDATE_TYPES = ["PROGRESS", "EXPENSE", "PHOTO", "COMPLETION", "ANNOUNCEMENT"];
 
 const inputCls = "w-full px-4 py-3 rounded-xl bg-[#161625] border border-white/[0.08] text-white text-sm placeholder-white/20 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500/30 transition-all";
 
+async function sha256Bytes(input: string): Promise<number[]> {
+    const encoded = new TextEncoder().encode(input);
+    const digest = await crypto.subtle.digest("SHA-256", encoded as unknown as BufferSource);
+    return Array.from(new Uint8Array(digest));
+}
+
 export default function ManageCampaignPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params);
     const { authenticated, login, user } = usePrivy();
+    const { sendTransaction: sendPrivyTransaction } = useSendTransaction();
+    const { wallets: connectedStandardWallets } = useConnectedStandardWallets();
+    const { signAndSendTransaction } = useStandardSignAndSendTransaction();
+    const { connection } = useConnection();
+    const { publicKey, sendTransaction: sendWalletAdapterTransaction } = useWallet();
     const [campaign, setCampaign] = useState<Campaign | null>(null);
     const [loading, setLoading] = useState(true);
     const [activeMilestone, setActiveMilestone] = useState<Milestone | null>(null);
@@ -27,6 +52,7 @@ export default function ManageCampaignPage({ params }: { params: Promise<{ id: s
     const [proof, setProof] = useState<MilestoneProof | null>(null);
 
     const [proofLoading, setProofLoading] = useState(false);
+    const [proofSyncLoading, setProofSyncLoading] = useState(false);
     const [invoiceFile, setInvoiceFile] = useState<File | null>(null);
     const [gstin, setGstin] = useState("");
     const [invoiceNumber, setInvoiceNumber] = useState("");
@@ -70,8 +96,19 @@ export default function ManageCampaignPage({ params }: { params: Promise<{ id: s
 
     const handleSubmitProof = async () => {
         if (!activeMilestone) return;
+        const currentCampaign = campaign;
+        if (!currentCampaign) return;
         if (!isUnregistered && !gstin) { toast.error("Enter vendor GSTIN or mark as unregistered"); return; }
         if (!invoiceFile) { toast.error("Upload the invoice first"); return; }
+        const signerAddr = publicKey?.toBase58() ?? linkedAddr ?? user?.wallet?.address;
+        if (!signerAddr) {
+            toast.error("Connect your creator wallet first");
+            return;
+        }
+        if (!currentCampaign.onchainProjectPda && !(currentCampaign.projectIdBytes && currentCampaign.org?.walletAddress)) {
+            toast.error("Campaign is missing on-chain project reference");
+            return;
+        }
         setProofLoading(true);
         try {
             const { uploadUrl, s3Key } = await presignProofUpload(activeMilestone.id, invoiceFile.name, invoiceFile.type);
@@ -84,19 +121,148 @@ export default function ManageCampaignPage({ params }: { params: Promise<{ id: s
                 const detail = await putRes.text().catch(() => "");
                 throw new Error(`File upload failed (${putRes.status})${detail ? `: ${detail}` : ""}`);
             }
-            await submitMilestoneProof(activeMilestone.id, {
+            const proofResult = await submitMilestoneProof(activeMilestone.id, {
                 gstin: isUnregistered ? undefined : gstin.toUpperCase().trim(),
                 isUnregisteredVendor: isUnregistered, invoiceS3Key: s3Key,
                 invoiceNumber: invoiceNumber || undefined,
                 invoiceAmountPaise: invoiceAmount ? Math.round(parseFloat(invoiceAmount) * 100) : undefined,
                 votingWindowSecs: votingHours * 3600,
             });
+            const projectPda = currentCampaign.onchainProjectPda
+                ? new PublicKey(currentCampaign.onchainProjectPda)
+                : (() => {
+                    const [pda] = deriveProjectPDA(
+                        new PublicKey(currentCampaign.org.walletAddress!),
+                        hexToProjectId(currentCampaign.projectIdBytes!)
+                    );
+                    return pda;
+                })();
+            const creatorPk = new PublicKey(signerAddr);
+            const provider = new AnchorProvider(connection, {} as never, { commitment: "confirmed" });
+            const orgGstinHashBytes = isUnregistered
+                ? new Array(32).fill(0)
+                : currentCampaign.org.gstin
+                    ? await sha256Bytes(currentCampaign.org.gstin.trim().toUpperCase())
+                    : (() => { throw new Error("Org GSTIN missing for on-chain proof submission"); })();
+            const tx = await buildSubmitMilestoneProofTx(
+                getProgram(provider),
+                creatorPk,
+                projectPda,
+                activeMilestone.index,
+                s3Key,
+                String((proofResult as { invoiceHash: string }).invoiceHash),
+                orgGstinHashBytes,
+                Number((proofResult as { votingWindowSecs: number }).votingWindowSecs ?? votingHours * 3600)
+            );
+            const { blockhash } = await connection.getLatestBlockhash("confirmed");
+            tx.feePayer = creatorPk;
+            tx.recentBlockhash = blockhash;
+
+            let proofSig: string | undefined;
+            if (publicKey && publicKey.toBase58() === signerAddr) {
+                proofSig = await sendWalletAdapterTransaction(tx, connection);
+            } else {
+                const stdWallet = connectedStandardWallets.find(
+                    (wallet) => wallet.address.toLowerCase() === signerAddr.toLowerCase()
+                );
+                if (stdWallet) {
+                    await signAndSendTransaction({
+                        transaction: tx.serialize({ requireAllSignatures: false, verifySignatures: false }),
+                        wallet: stdWallet,
+                        chain: "solana:devnet",
+                    });
+                } else {
+                    const receipt = await sendPrivyTransaction({ transaction: tx, connection, address: signerAddr });
+                    proofSig = receipt.signature;
+                }
+            }
+            await confirmMilestoneProofOnchain(activeMilestone.id, { onchainProofUri: s3Key, txSignature: proofSig });
             toast.success("Proof submitted!", { description: `Voting open for ${votingHours}h.` });
             await load();
             setProof(await fetchMilestoneProof(activeMilestone.id));
         } catch (e: unknown) {
             toast.error("Proof submission failed", { description: e instanceof Error ? e.message : "Error" });
         } finally { setProofLoading(false); }
+    };
+
+    const handleRetryOnchainProof = async () => {
+        if (!activeMilestone || !proof) return;
+        const currentCampaign = campaign;
+        if (!currentCampaign) return;
+        const proofUri = proof.invoiceS3Key ?? activeMilestone.proofUri;
+        if (!proofUri || !proof.invoiceHash) {
+            toast.error("Missing proof data", { description: "Invoice key or hash not found. Re-upload proof." });
+            return;
+        }
+        const signerAddr = publicKey?.toBase58() ?? linkedAddr ?? user?.wallet?.address;
+        if (!signerAddr) {
+            toast.error("Connect your creator wallet first");
+            return;
+        }
+        if (!currentCampaign.onchainProjectPda && !(currentCampaign.projectIdBytes && currentCampaign.org?.walletAddress)) {
+            toast.error("Campaign is missing on-chain project reference");
+            return;
+        }
+
+        setProofSyncLoading(true);
+        try {
+            const orgGstinHashBytes = proof.isUnregisteredVendor
+                ? new Array(32).fill(0)
+                : currentCampaign.org.gstin
+                    ? await sha256Bytes(currentCampaign.org.gstin.trim().toUpperCase())
+                    : (() => { throw new Error("Org GSTIN missing for on-chain proof submission"); })();
+            const projectPda = currentCampaign.onchainProjectPda
+                ? new PublicKey(currentCampaign.onchainProjectPda)
+                : (() => {
+                    const [pda] = deriveProjectPDA(
+                        new PublicKey(currentCampaign.org.walletAddress!),
+                        hexToProjectId(currentCampaign.projectIdBytes!)
+                    );
+                    return pda;
+                })();
+            const creatorPk = new PublicKey(signerAddr);
+            const provider = new AnchorProvider(connection, {} as never, { commitment: "confirmed" });
+            const tx = await buildSubmitMilestoneProofTx(
+                getProgram(provider),
+                creatorPk,
+                projectPda,
+                activeMilestone.index,
+                proofUri,
+                proof.invoiceHash,
+                orgGstinHashBytes,
+                activeMilestone.votingWindowSecs
+            );
+            const { blockhash } = await connection.getLatestBlockhash("confirmed");
+            tx.feePayer = creatorPk;
+            tx.recentBlockhash = blockhash;
+
+            let proofSig: string | undefined;
+            if (publicKey && publicKey.toBase58() === signerAddr) {
+                proofSig = await sendWalletAdapterTransaction(tx, connection);
+            } else {
+                const stdWallet = connectedStandardWallets.find(
+                    (wallet) => wallet.address.toLowerCase() === signerAddr.toLowerCase()
+                );
+                if (stdWallet) {
+                    await signAndSendTransaction({
+                        transaction: tx.serialize({ requireAllSignatures: false, verifySignatures: false }),
+                        wallet: stdWallet,
+                        chain: "solana:devnet",
+                    });
+                } else {
+                    const receipt = await sendPrivyTransaction({ transaction: tx, connection, address: signerAddr });
+                    proofSig = receipt.signature;
+                }
+            }
+            await confirmMilestoneProofOnchain(activeMilestone.id, { onchainProofUri: proofUri, txSignature: proofSig });
+            toast.success("Voting opened on-chain");
+            await load();
+            setProof(await fetchMilestoneProof(activeMilestone.id));
+        } catch (e: unknown) {
+            toast.error("On-chain proof sync failed", { description: e instanceof Error ? e.message : "Error" });
+        } finally {
+            setProofSyncLoading(false);
+        }
     };
 
     const handlePostUpdate = async () => {
@@ -136,7 +302,7 @@ export default function ManageCampaignPage({ params }: { params: Promise<{ id: s
         linkedSolanaAccount && "address" in linkedSolanaAccount && typeof linkedSolanaAccount.address === "string"
             ? linkedSolanaAccount.address
             : undefined;
-    const connectedWallet = user?.wallet?.address ?? linkedAddr;
+    const connectedWallet = publicKey?.toBase58() ?? user?.wallet?.address ?? linkedAddr;
     const isOwner = Boolean(
         connectedWallet &&
         campaign?.org?.walletAddress &&
@@ -208,6 +374,15 @@ export default function ManageCampaignPage({ params }: { params: Promise<{ id: s
                                     <p className="text-[11px] text-white/40 mt-1">
                                         Submitted on {new Date(proof.submittedAt).toLocaleString("en-IN")} · Hash {proof.invoiceHash.slice(0, 12)}...
                                     </p>
+                                    {!proof.onchainProofUri && (
+                                        <button
+                                            disabled={!isOwner || proofSyncLoading}
+                                            onClick={handleRetryOnchainProof}
+                                            className="mt-3 w-full py-2.5 rounded-lg border border-amber-500/30 text-amber-300 text-xs font-semibold hover:bg-amber-500/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                                        >
+                                            {proofSyncLoading ? "Opening voting on-chain…" : "Retry Opening Voting On-Chain"}
+                                        </button>
+                                    )}
                                 </div>
                             )}
                             {isUnderReview ? (

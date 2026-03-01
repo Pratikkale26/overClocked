@@ -206,7 +206,7 @@ milestonesRouter.post("/:id/proof", requireAuth, async (req: AuthedRequest, res)
             },
         });
 
-        // ── 6. Update milestone state + proof note ──────────────────────────
+        // ── 6. Save requested voting config + proof note (state flips only after on-chain confirm) ──
         const windowSecs = Math.min(
             Math.max(Number(votingWindowSecs ?? MIN_VOTING_WINDOW_SECS), MIN_VOTING_WINDOW_SECS),
             MAX_VOTING_WINDOW_SECS
@@ -217,7 +217,6 @@ milestonesRouter.post("/:id/proof", requireAuth, async (req: AuthedRequest, res)
                 proofUri: invoiceS3Key,
                 proofNote,
                 votingWindowSecs: windowSecs,
-                state: "UNDER_REVIEW",
             },
         });
 
@@ -309,6 +308,13 @@ milestonesRouter.post("/:id/proof/onchain-confirmed", requireAuth, async (req: A
         await prisma.milestoneProof.update({
             where: { milestoneId },
             data: { onchainProofUri },
+        });
+        await prisma.milestone.update({
+            where: { id: milestoneId },
+            data: {
+                state: "UNDER_REVIEW",
+                ...(onchainProofUri ? { proofUri: onchainProofUri } : {}),
+            },
         });
 
         res.json({ success: true, txSignature });

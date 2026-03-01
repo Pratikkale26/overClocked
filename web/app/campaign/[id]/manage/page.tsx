@@ -17,7 +17,7 @@ import { Navbar } from "../../../../components/layout/Navbar";
 import { DprTimeline } from "../../../../components/campaigns/DprTimeline";
 import {
     fetchCampaign, fetchMilestoneUpdates, postMilestoneUpdate,
-    submitMilestoneProof, presignProofUpload, fetchMilestoneProof, confirmMilestoneProofOnchain,
+    submitMilestoneProof, presignProofUpload, fetchMilestoneProof, confirmMilestoneProofOnchain, presignUpdateMedia,
     type Campaign, type Milestone, type MilestoneUpdate, type MilestoneProof,
 } from "../../../../lib/api";
 import {
@@ -64,6 +64,7 @@ export default function ManageCampaignPage({ params }: { params: Promise<{ id: s
     const [updateType, setUpdateType] = useState("PROGRESS");
     const [updateTitle, setUpdateTitle] = useState("");
     const [updateDesc, setUpdateDesc] = useState("");
+    const [updateFiles, setUpdateFiles] = useState<File[]>([]);
 
     const load = useCallback(async () => {
         try {
@@ -269,9 +270,28 @@ export default function ManageCampaignPage({ params }: { params: Promise<{ id: s
         if (!activeMilestone || !updateTitle.trim()) return;
         setUpdateLoading(true);
         try {
-            await postMilestoneUpdate(activeMilestone.id, { type: updateType, title: updateTitle.trim(), description: updateDesc.trim() || undefined });
+            const mediaKeys: string[] = [];
+            for (const file of updateFiles) {
+                const { uploadUrl, s3Key } = await presignUpdateMedia(activeMilestone.id, file.name, file.type || "application/octet-stream");
+                const putRes = await fetch(uploadUrl, {
+                    method: "PUT",
+                    body: file,
+                    headers: { "Content-Type": file.type || "application/octet-stream" },
+                });
+                if (!putRes.ok) {
+                    const detail = await putRes.text().catch(() => "");
+                    throw new Error(`Media upload failed (${putRes.status})${detail ? `: ${detail}` : ""}`);
+                }
+                mediaKeys.push(s3Key);
+            }
+            await postMilestoneUpdate(activeMilestone.id, {
+                type: updateType,
+                title: updateTitle.trim(),
+                description: updateDesc.trim() || undefined,
+                mediaUrls: mediaKeys,
+            });
             toast.success("Update posted!");
-            setUpdateTitle(""); setUpdateDesc("");
+            setUpdateTitle(""); setUpdateDesc(""); setUpdateFiles([]);
             setUpdates(await fetchMilestoneUpdates(activeMilestone.id));
         } catch (e: unknown) {
             toast.error("Failed", { description: e instanceof Error ? e.message : "Error" });
@@ -374,6 +394,21 @@ export default function ManageCampaignPage({ params }: { params: Promise<{ id: s
                                     <p className="text-[11px] text-white/40 mt-1">
                                         Submitted on {new Date(proof.submittedAt).toLocaleString("en-IN")} · Hash {proof.invoiceHash.slice(0, 12)}...
                                     </p>
+                                    <div className="mt-2 flex flex-wrap gap-2 text-[11px]">
+                                        <span className={`px-2 py-1 rounded-md border ${proof.integrityChecked ? "border-emerald-500/30 text-emerald-300" : "border-amber-500/30 text-amber-300"}`}>
+                                            {proof.integrityChecked ? "Invoice hash verified" : "Invoice hash mismatch"}
+                                        </span>
+                                        {proof.invoiceUrl && (
+                                            <a
+                                                href={proof.invoiceUrl}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                className="px-2 py-1 rounded-md border border-white/15 text-white/70 hover:text-white hover:border-violet-500/40 transition-all"
+                                            >
+                                                View invoice
+                                            </a>
+                                        )}
+                                    </div>
                                     {!proof.onchainProofUri && (
                                         <button
                                             disabled={!isOwner || proofSyncLoading}
@@ -455,6 +490,27 @@ export default function ManageCampaignPage({ params }: { params: Promise<{ id: s
                                 <div>
                                     <label className="block text-xs font-semibold text-white/40 uppercase tracking-wider mb-2">Details</label>
                                 <textarea className={inputCls + " min-h-[80px] resize-y"} placeholder="Additional context for donors…" value={updateDesc} onChange={(e) => setUpdateDesc(e.target.value)} />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-semibold text-white/40 uppercase tracking-wider mb-2">Attach Photos / Files</label>
+                                    <label className="flex flex-col items-center justify-center gap-2 p-4 border-2 border-dashed border-white/[0.08] rounded-xl cursor-pointer hover:border-violet-500/30 transition-all">
+                                        <Upload size={16} className="text-white/25" />
+                                        <span className="text-xs text-white/30">
+                                            {updateFiles.length ? `${updateFiles.length} file(s) selected` : "Click to upload images/docs"}
+                                        </span>
+                                        <input
+                                            type="file"
+                                            multiple
+                                            accept=".pdf,.jpg,.jpeg,.png,.webp,.mp4"
+                                            className="hidden"
+                                            onChange={(e) => setUpdateFiles(Array.from(e.target.files ?? []))}
+                                        />
+                                    </label>
+                                    {!!updateFiles.length && (
+                                        <p className="text-[11px] text-white/35 mt-2 truncate">
+                                            {updateFiles.map((file) => file.name).join(", ")}
+                                        </p>
+                                    )}
                                 </div>
                                 <button disabled={!isOwner || !canPostUpdate || updateLoading || !updateTitle.trim()} onClick={handlePostUpdate}
                                     className="w-full py-3 rounded-xl border border-violet-500/30 text-violet-300 font-semibold hover:bg-violet-500/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all">

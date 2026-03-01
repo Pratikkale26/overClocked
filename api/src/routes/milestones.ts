@@ -3,7 +3,7 @@ import crypto from "crypto";
 import { prisma } from "../db.js";
 import type { AuthedRequest } from "../middleware/auth.js";
 import { requireAuth } from "../middleware/auth.js";
-import { getPresignedUploadUrl } from "../services/s3.js";
+import { getPresignedDownloadUrl, getPresignedUploadUrl, toPublicObjectUrl } from "../services/s3.js";
 import { computeGstinHashHex, normalizeGstin, validateGstin } from "../services/gstin.service.js";
 
 export const milestonesRouter = Router();
@@ -13,6 +13,47 @@ const MAX_VOTING_WINDOW_SECS = 604_800; // 7 days
 
 function firstParam(value: string | string[] | undefined): string | undefined {
     return Array.isArray(value) ? value[0] : value;
+}
+
+async function mapMediaUrls(mediaUrls: string[]): Promise<string[]> {
+    return Promise.all(
+        mediaUrls.map(async (entry) => {
+            if (/^https?:\/\//i.test(entry)) return entry;
+            try {
+                return await getPresignedDownloadUrl(entry, 3600);
+            } catch {
+                return toPublicObjectUrl(entry);
+            }
+        })
+    );
+}
+
+async function mapProofForClient(proof: {
+    invoiceS3Key: string | null;
+    gstin: string | null;
+    invoiceNumber: string | null;
+    invoiceHash: string;
+    invoiceAmountPaise: bigint | null;
+    [key: string]: unknown;
+}) {
+    const invoiceS3Key = proof.invoiceS3Key ?? "";
+    const hashInput = [invoiceS3Key, proof.gstin ?? "unregistered", proof.invoiceNumber ?? ""].join("|");
+    const expectedHash = crypto.createHash("sha256").update(hashInput).digest("hex");
+    let invoiceUrl: string | null = null;
+    if (invoiceS3Key) {
+        try {
+            invoiceUrl = await getPresignedDownloadUrl(invoiceS3Key, 3600);
+        } catch {
+            // Fallback for publicly readable buckets/CDN.
+            invoiceUrl = toPublicObjectUrl(invoiceS3Key);
+        }
+    }
+    return {
+        ...proof,
+        invoiceAmountPaise: proof.invoiceAmountPaise?.toString(),
+        invoiceUrl,
+        integrityChecked: expectedHash === proof.invoiceHash,
+    };
 }
 
 async function isMilestoneOwner(milestoneId: string, privyId: string): Promise<boolean> {
@@ -269,10 +310,7 @@ milestonesRouter.get("/:id/proof", async (req, res) => {
         const proof = milestone.proof;
 
         res.json({
-            proof: {
-                ...proof,
-                invoiceAmountPaise: proof.invoiceAmountPaise?.toString(),
-            },
+            proof: await mapProofForClient(proof),
         });
     } catch (err) {
         console.error("[milestones/proof/get]", err);
@@ -449,7 +487,14 @@ milestonesRouter.get("/:id/updates", async (req, res) => {
             where: { milestoneId },
             orderBy: { postedAt: "asc" },
         });
-        res.json({ updates });
+        res.json({
+            updates: await Promise.all(
+                updates.map(async (update) => ({
+                    ...update,
+                    mediaUrls: await mapMediaUrls(update.mediaUrls),
+                }))
+            ),
+        });
     } catch (err) {
         console.error("[milestones/updates/list]", err);
         res.status(500).json({ error: "Internal server error" });
@@ -492,11 +537,14 @@ milestonesRouter.get("/:id/full", async (req, res) => {
                 ...milestone,
                 amountLamports: milestone.amountLamports.toString(),
                 proof: milestone.proof
-                    ? {
-                        ...milestone.proof,
-                        invoiceAmountPaise: milestone.proof.invoiceAmountPaise?.toString(),
-                    }
+                    ? await mapProofForClient(milestone.proof)
                     : null,
+                updates: await Promise.all(
+                    milestone.updates.map(async (update) => ({
+                        ...update,
+                        mediaUrls: await mapMediaUrls(update.mediaUrls),
+                    }))
+                ),
                 campaign: {
                     ...milestone.campaign,
                     raisedLamports: milestone.campaign.raisedLamports.toString(),
@@ -531,7 +579,7 @@ milestonesRouter.get("/campaign/:campaignId/proof-chain", async (req, res) => {
             },
         });
 
-        const chain = milestones.map(m => ({
+        const chain = await Promise.all(milestones.map(async (m) => ({
             id: m.id,
             index: m.index,
             title: m.title,
@@ -545,14 +593,28 @@ milestonesRouter.get("/campaign/:campaignId/proof-chain", async (req, res) => {
                     vendorState: m.proof.vendorState,
                     isUnregisteredVendor: m.proof.isUnregisteredVendor,
                     invoiceHash: m.proof.invoiceHash,
+                    invoiceS3Key: m.proof.invoiceS3Key,
+                    invoiceUrl: m.proof.invoiceS3Key
+                        ? await getPresignedDownloadUrl(m.proof.invoiceS3Key, 3600).catch(() => toPublicObjectUrl(m.proof!.invoiceS3Key!))
+                        : null,
+                    integrityChecked: crypto.createHash("sha256").update([
+                        m.proof.invoiceS3Key ?? "",
+                        m.proof.gstin ?? "unregistered",
+                        m.proof.invoiceNumber ?? "",
+                    ].join("|")).digest("hex") === m.proof.invoiceHash,
                     prevProofHash: m.proof.prevProofHash,
                     onchainProofUri: m.proof.onchainProofUri,
                     submittedAt: m.proof.submittedAt,
                 }
                 : null,
-            updates: m.updates,
+            updates: await Promise.all(
+                m.updates.map(async (update) => ({
+                    ...update,
+                    mediaUrls: await mapMediaUrls(update.mediaUrls),
+                }))
+            ),
             updateCount: m.updates.length,
-        }));
+        })));
 
         res.json({ chain });
     } catch (err) {

@@ -285,7 +285,9 @@ export interface MilestoneProof {
     invoiceNumber?: string;
     invoiceAmountPaise?: string;
     invoiceS3Key?: string;
+    invoiceUrl?: string | null;
     invoiceHash: string;
+    integrityChecked?: boolean;
     prevProofHash?: string;
     isUnregisteredVendor: boolean;
     onchainProofUri?: string;

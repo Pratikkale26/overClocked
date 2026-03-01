@@ -52,6 +52,13 @@ function joinUrl(base: string, path: string): string {
     return `${base.replace(/\/+$/, "")}/${path.replace(/^\/+/, "")}`;
 }
 
+export function toPublicObjectUrl(key: string): string {
+    if (/^https?:\/\//i.test(key)) return key;
+    if (AWS_PUBLIC_BASE_URL) return joinUrl(AWS_PUBLIC_BASE_URL, key);
+    if (RAW_AWS_ENDPOINT) return joinUrl(RAW_AWS_ENDPOINT, key);
+    return `https://${BUCKET}.s3.${AWS_REGION}.amazonaws.com/${key}`;
+}
+
 /**
  * Generate a 15-minute presigned PUT URL for direct browser uploads.
  * Returns the upload URL and the resulting public URL.

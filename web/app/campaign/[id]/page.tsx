@@ -213,9 +213,26 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
                     Phase {activeMilestone.index + 1}: {activeMilestone.title}
                   </p>
                   {activeProof ? (
-                    <p className="text-[11px] text-white/35">
-                      Proof submitted on {new Date(activeProof.submittedAt).toLocaleString("en-IN")} · Hash {activeProof.invoiceHash.slice(0, 12)}...
-                    </p>
+                    <div>
+                      <p className="text-[11px] text-white/35">
+                        Proof submitted on {new Date(activeProof.submittedAt).toLocaleString("en-IN")} · Hash {activeProof.invoiceHash.slice(0, 12)}...
+                      </p>
+                      <div className="mt-2 flex flex-wrap gap-2 text-[11px]">
+                        <span className={`px-2 py-1 rounded-md border ${activeProof.integrityChecked ? "border-emerald-500/30 text-emerald-300" : "border-amber-500/30 text-amber-300"}`}>
+                          {activeProof.integrityChecked ? "Invoice hash verified" : "Invoice hash mismatch"}
+                        </span>
+                        {activeProof.invoiceUrl && (
+                          <a
+                            href={activeProof.invoiceUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="px-2 py-1 rounded-md border border-white/15 text-white/70 hover:text-white hover:border-violet-500/40 transition-all"
+                          >
+                            View submitted invoice
+                          </a>
+                        )}
+                      </div>
+                    </div>
                   ) : (
                     <p className="text-[11px] text-white/30">No proof submitted for this phase yet.</p>
                   )}

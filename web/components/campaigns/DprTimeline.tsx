@@ -58,12 +58,31 @@ export function DprTimeline({ updates, title = "Activity Log" }: { updates: Mile
                             {u.mediaUrls?.length > 0 && (
                                 <div className="flex gap-2 mt-2.5 flex-wrap">
                                     {u.mediaUrls.map((url, mi) => (
-                                        <a key={mi} href={url} target="_blank" rel="noreferrer">
-                                            <img src={url} alt={`media-${mi}`}
-                                                className="w-20 h-16 object-cover rounded-lg border border-white/[0.06] hover:border-violet-500/30 transition-colors"
-                                                onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-                                            />
-                                        </a>
+                                        (() => {
+                                            const lower = url.toLowerCase();
+                                            const isImage = [".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".svg"].some((ext) => lower.includes(ext));
+                                            if (isImage) {
+                                                return (
+                                                    <a key={mi} href={url} target="_blank" rel="noreferrer">
+                                                        <img src={url} alt={`media-${mi}`}
+                                                            className="w-20 h-16 object-cover rounded-lg border border-white/[0.06] hover:border-violet-500/30 transition-colors"
+                                                            onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                                                        />
+                                                    </a>
+                                                );
+                                            }
+                                            return (
+                                                <a
+                                                    key={mi}
+                                                    href={url}
+                                                    target="_blank"
+                                                    rel="noreferrer"
+                                                    className="px-2 py-1 rounded-md border border-white/[0.08] text-[11px] text-white/60 hover:text-white/80 hover:border-violet-500/30 transition-colors"
+                                                >
+                                                    Attachment {mi + 1}
+                                                </a>
+                                            );
+                                        })()
                                     ))}
                                 </div>
                             )}

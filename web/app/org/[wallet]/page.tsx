@@ -5,7 +5,7 @@ import Link from "next/link";
 import { ArrowLeft, Shield, MapPin, Globe, TrendingUp, Users } from "lucide-react";
 import { Navbar } from "../../../components/layout/Navbar";
 import { CampaignCard } from "../../../components/campaigns/CampaignCard";
-import { fetchOrgByWallet, fetchCampaigns, type Campaign } from "../../../lib/api";
+import { fetchOrg, fetchCampaigns, type Campaign } from "../../../lib/api";
 import { formatSol, shortenAddress, ORG_CATEGORY_LABELS } from "../../../lib/utils";
 
 export default function OrgProfilePage({ params }: { params: Promise<{ wallet: string }> }) {
@@ -17,7 +17,7 @@ export default function OrgProfilePage({ params }: { params: Promise<{ wallet: s
     useEffect(() => {
         (async () => {
             try {
-                const o = await fetchOrgByWallet(wallet);
+                const o = await fetchOrg(wallet);
                 setOrg(o);
                 const allCampaigns = await fetchCampaigns({ limit: 100 });
                 setCampaigns(allCampaigns.filter(
